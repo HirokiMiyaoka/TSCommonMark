@@ -1,0 +1,12 @@
+{
+  "name": "tscommonmark",
+  "version": "0.27.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "node test.js"
+  },
+  "author": "Hiroki",
+  "license": "MIT"
+}
