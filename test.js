@@ -29,7 +29,7 @@ function Test( file )
 {
 	const source = fs.readFileSync( path.join( 'test', file ), { encoding: 'utf8' } ).replace( /\r\n|\r/g, '\n' );
 	const result = fs.readFileSync( path.join( 'test', file.replace( '.md', '.html' ) ), { encoding: 'utf8' } ).replace( /\r\n|\r/g, '\n' );
-	const compiled = cmarked( source );
+	const compiled = cmarked.parse2String( source );
 
 	if ( compiled !== result )
 	{
