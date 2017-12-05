@@ -9,6 +9,7 @@ declare module TSCommonMark {
         private addHeadline(now, line);
         private addUList(now, line);
         private addCodeBlock(now, line);
+        private addLine(now, line);
         private popStack();
         private initStack();
         private lastStack();

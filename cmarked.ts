@@ -11,6 +11,7 @@ module TSCommonMark
 		PARAGRAPH,
 		CODE,
 		ULIST,
+		LINE,
 	};
 
 	interface TagOption
@@ -143,6 +144,10 @@ module TSCommonMark
 					this.addCodeBlock( type, line + '\n' );
 					type = ltype;
 					break;
+				case CommonMarkTypes.LINE:
+					this.addLine( type, line );
+					type = CommonMarkTypes.NONE;
+					break;
 				}
 			} );
 
@@ -198,6 +203,15 @@ module TSCommonMark
 			coderoot.appendChild( new LiteTextNode( line ) );
 		}
 
+		private addLine( now: CommonMarkTypes, line: string )
+		{
+			this.initStack();
+			const [ lv, title ] = line.split( /\s+/, 2 );
+			const root = new LiteNode( 'hr' );
+			this.lastStack().appendChild( root );
+			this.stack.push( root );
+		}
+
 		private popStack()
 		{
 			if ( this.stack.length <= 1 ) { return; }
@@ -224,6 +238,9 @@ module TSCommonMark
 
 			// Code block
 			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
+
+			// Line
+			if ( line.match( /^\s{0,3}(\*\*\*|\-\-\-|\_\_\_)\s*$/ ) ) { return CommonMarkTypes.LINE; }
 
 			return CommonMarkTypes.NONE;
 		}

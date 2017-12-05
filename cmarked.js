@@ -1,13 +1,14 @@
 "use strict";
 var TSCommonMark;
 (function (TSCommonMark) {
-    var CommonMarkTypes;
+    let CommonMarkTypes;
     (function (CommonMarkTypes) {
         CommonMarkTypes[CommonMarkTypes["NONE"] = 0] = "NONE";
         CommonMarkTypes[CommonMarkTypes["HEADLINE"] = 1] = "HEADLINE";
         CommonMarkTypes[CommonMarkTypes["PARAGRAPH"] = 2] = "PARAGRAPH";
         CommonMarkTypes[CommonMarkTypes["CODE"] = 3] = "CODE";
         CommonMarkTypes[CommonMarkTypes["ULIST"] = 4] = "ULIST";
+        CommonMarkTypes[CommonMarkTypes["LINE"] = 5] = "LINE";
     })(CommonMarkTypes || (CommonMarkTypes = {}));
     ;
     class LiteNodeBase {
@@ -91,6 +92,10 @@ var TSCommonMark;
                         this.addCodeBlock(type, line + '\n');
                         type = ltype;
                         break;
+                    case CommonMarkTypes.LINE:
+                        this.addLine(type, line);
+                        type = CommonMarkTypes.NONE;
+                        break;
                 }
             });
             return this;
@@ -136,6 +141,13 @@ var TSCommonMark;
             const coderoot = this.stack[this.stack.length - 1];
             coderoot.appendChild(new LiteTextNode(line));
         }
+        addLine(now, line) {
+            this.initStack();
+            const [lv, title] = line.split(/\s+/, 2);
+            const root = new LiteNode('hr');
+            this.lastStack().appendChild(root);
+            this.stack.push(root);
+        }
         popStack() {
             if (this.stack.length <= 1) {
                 return;
@@ -157,6 +169,9 @@ var TSCommonMark;
             }
             if (line.match(/^\>{0,1}(\t|    | {1,3}\t)/)) {
                 return CommonMarkTypes.CODE;
+            }
+            if (line.match(/^\s{0,3}(\*\*\*|\-\-\-|\_\_\_)\s*$/)) {
+                return CommonMarkTypes.LINE;
             }
             return CommonMarkTypes.NONE;
         }
