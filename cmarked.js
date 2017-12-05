@@ -79,6 +79,16 @@ var TSCommonMark;
             const lines = source.split('\n');
             lines.forEach((line) => {
                 const ltype = this.lineType(line);
+                if (ltype === CommonMarkTypes.NONE) {
+                    if (type === CommonMarkTypes.PARAGRAPH) {
+                        type = CommonMarkTypes.NONE;
+                    }
+                }
+                else if (type === CommonMarkTypes.PARAGRAPH) {
+                    this.addParagraph(type, line);
+                    type = ltype;
+                    return;
+                }
                 switch (ltype) {
                     case CommonMarkTypes.HEADLINE:
                         this.addHeadline(type, line);
@@ -89,7 +99,11 @@ var TSCommonMark;
                         type = ltype;
                         break;
                     case CommonMarkTypes.CODE:
-                        this.addCodeBlock(type, line + '\n');
+                        this.addCodeBlock(type, line);
+                        type = ltype;
+                        break;
+                    case CommonMarkTypes.PARAGRAPH:
+                        this.addParagraph(type, line);
                         type = ltype;
                         break;
                     case CommonMarkTypes.LINE:
@@ -119,8 +133,26 @@ var TSCommonMark;
             item.appendChild(new LiteTextNode(line.split('- ', 2)[1]));
             this.lastStack().appendChild(item);
         }
+        addParagraph(now, line) {
+            line = line.replace(/^\s+/, '');
+            if (!line) {
+                return;
+            }
+            if (now !== CommonMarkTypes.PARAGRAPH) {
+                this.initStack();
+                const root = new LiteNode('p');
+                this.lastStack().appendChild(root);
+                this.stack.push(root);
+            }
+            else {
+                line = '\n' + line;
+            }
+            const proot = this.lastStack();
+            proot.appendChild(new LiteTextNode(line));
+        }
         addCodeBlock(now, line) {
             let softtab = !!line.match(/^\>/);
+            line += '\n';
             if (now !== CommonMarkTypes.CODE) {
                 this.popStack();
                 let root = new LiteNode('pre');
@@ -143,7 +175,6 @@ var TSCommonMark;
         }
         addLine(now, line) {
             this.initStack();
-            const [lv, title] = line.split(/\s+/, 2);
             const root = new LiteNode('hr');
             this.lastStack().appendChild(root);
             this.stack.push(root);
@@ -164,16 +195,19 @@ var TSCommonMark;
             if (line.match(/^\#{1,6}\s+/)) {
                 return CommonMarkTypes.HEADLINE;
             }
+            if (line.match(/^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/)) {
+                return CommonMarkTypes.LINE;
+            }
             if (line.match(/^ {0,3}\- /)) {
                 return CommonMarkTypes.ULIST;
             }
             if (line.match(/^\>{0,1}(\t|    | {1,3}\t)/)) {
                 return CommonMarkTypes.CODE;
             }
-            if (line.match(/^\s{0,3}(\*\*\*|\-\-\-|\_\_\_)\s*$/)) {
-                return CommonMarkTypes.LINE;
+            if (!line) {
+                return CommonMarkTypes.NONE;
             }
-            return CommonMarkTypes.NONE;
+            return CommonMarkTypes.PARAGRAPH;
         }
     }
     TSCommonMark.CommonMark = CommonMark;

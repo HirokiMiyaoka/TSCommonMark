@@ -8,6 +8,7 @@ declare module TSCommonMark {
         parse(source: string): this;
         private addHeadline(now, line);
         private addUList(now, line);
+        private addParagraph(now, line);
         private addCodeBlock(now, line);
         private addLine(now, line);
         private popStack();

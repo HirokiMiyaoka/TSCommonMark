@@ -130,6 +130,16 @@ module TSCommonMark
 			{
 				const ltype = this.lineType( line );
 
+				if ( ltype === CommonMarkTypes.NONE )
+				{
+					if ( type === CommonMarkTypes.PARAGRAPH ) { type = CommonMarkTypes.NONE; }
+				} else if ( type === CommonMarkTypes.PARAGRAPH )
+				{
+					this.addParagraph( type, line );
+					type = ltype;
+					return;
+				}
+
 				switch ( ltype )
 				{
 				case CommonMarkTypes.HEADLINE:
@@ -141,7 +151,11 @@ module TSCommonMark
 					type = ltype;
 					break;
 				case CommonMarkTypes.CODE:
-					this.addCodeBlock( type, line + '\n' );
+					this.addCodeBlock( type, line );
+					type = ltype;
+					break;
+				case CommonMarkTypes.PARAGRAPH:
+					this.addParagraph( type, line );
 					type = ltype;
 					break;
 				case CommonMarkTypes.LINE:
@@ -178,9 +192,26 @@ module TSCommonMark
 			this.lastStack().appendChild( item );
 		}
 
+		private addParagraph( now: CommonMarkTypes, line: string )
+		{
+			line = line.replace( /^\s+/, '' );
+			if ( !line ) { return; }
+			if ( now !== CommonMarkTypes.PARAGRAPH )
+			{
+				this.initStack();
+				const root = new LiteNode( 'p' );
+				this.lastStack().appendChild( root );
+				this.stack.push( root );
+			} else { line = '\n' + line; }
+
+			const proot = this.lastStack();
+			proot.appendChild( new LiteTextNode( line ) );
+		}
+
 		private addCodeBlock( now: CommonMarkTypes, line: string )
 		{
 			let softtab = !!line.match( /^\>/ );
+			line += '\n';
 			if ( now !== CommonMarkTypes.CODE )
 			{
 				this.popStack();
@@ -206,7 +237,6 @@ module TSCommonMark
 		private addLine( now: CommonMarkTypes, line: string )
 		{
 			this.initStack();
-			const [ lv, title ] = line.split( /\s+/, 2 );
 			const root = new LiteNode( 'hr' );
 			this.lastStack().appendChild( root );
 			this.stack.push( root );
@@ -233,16 +263,19 @@ module TSCommonMark
 			// Headline
 			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
 
+			// Line
+			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
+
 			// List
 			if ( line.match( /^ {0,3}\- / ) ) { return CommonMarkTypes.ULIST; }
 
 			// Code block
 			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
 
-			// Line
-			if ( line.match( /^\s{0,3}(\*\*\*|\-\-\-|\_\_\_)\s*$/ ) ) { return CommonMarkTypes.LINE; }
-
-			return CommonMarkTypes.NONE;
+			// No line
+			if ( !line ) { return CommonMarkTypes.NONE; }
+			
+			return CommonMarkTypes.PARAGRAPH;
 		}
 
 	}
