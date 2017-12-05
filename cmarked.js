@@ -6,9 +6,10 @@ var TSCommonMark;
         CommonMarkTypes[CommonMarkTypes["NONE"] = 0] = "NONE";
         CommonMarkTypes[CommonMarkTypes["HEADLINE"] = 1] = "HEADLINE";
         CommonMarkTypes[CommonMarkTypes["PARAGRAPH"] = 2] = "PARAGRAPH";
-        CommonMarkTypes[CommonMarkTypes["CODE"] = 3] = "CODE";
-        CommonMarkTypes[CommonMarkTypes["ULIST"] = 4] = "ULIST";
-        CommonMarkTypes[CommonMarkTypes["LINE"] = 5] = "LINE";
+        CommonMarkTypes[CommonMarkTypes["ANCHOR"] = 3] = "ANCHOR";
+        CommonMarkTypes[CommonMarkTypes["CODE"] = 4] = "CODE";
+        CommonMarkTypes[CommonMarkTypes["ULIST"] = 5] = "ULIST";
+        CommonMarkTypes[CommonMarkTypes["LINE"] = 6] = "LINE";
     })(CommonMarkTypes || (CommonMarkTypes = {}));
     ;
     class LiteNodeBase {
@@ -39,11 +40,20 @@ var TSCommonMark;
         constructor(tag = '', option = {}) {
             super(tag, option);
             this.childlen = [];
+            this.attribute = {};
             this.newLineBegin = !!option.newLineBegin;
             this.newLine = !option.oneLine;
         }
-        appendChild(child) {
-            this.childlen.push(child);
+        appendChild(children) {
+            if (Array.isArray(children)) {
+                children.forEach((child) => { this.childlen.push(child); });
+            }
+            else {
+                this.childlen.push(children);
+            }
+        }
+        setAttribute(key, value) {
+            this.attribute[key] = value;
         }
         toString() {
             if (!this.tag) {
@@ -52,13 +62,30 @@ var TSCommonMark;
             if (!this.close) {
                 return '<' + this.tag + ' />' + (this.newLine ? '\n' : '');
             }
-            return '<' + this.tag + '>' + (this.newLineBegin ? '\n' : '') + this.toStringChildren() + '</' + this.tag + '>' + (this.newLine ? '\n' : '');
+            return '<' + this.tag + this.toStringAttribute() + '>' + (this.newLineBegin ? '\n' : '') + this.toStringChildren() + '</' + this.tag + '>' + (this.newLine ? '\n' : '');
+        }
+        toStringAttribute() {
+            const keys = Object.keys(this.attribute);
+            if (keys.length <= 0) {
+                return '';
+            }
+            return ' ' + keys.map((key) => {
+                return key + '="' + (this.attribute[key] || '').replace(/\"/g, '&quot;') + '"';
+            }).join(' ');
         }
         toStringChildren() {
             return this.childlen.map((child) => { return child.toString(); }).join('');
         }
-        toDOM() {
-            const root = document.createElement(this.tag || 'div');
+        toDOM(node) {
+            const root = node || document.createElement(this.tag || 'div');
+            Object.keys(this.attribute).forEach((key) => {
+                if (key === 'class') {
+                    root.classList.add(...this.attribute.class.split(' '));
+                }
+                else {
+                    root[key] = this.attribute[key];
+                }
+            });
             this.childlen.forEach((child) => {
                 root.appendChild(child.toDOM());
             });
@@ -69,7 +96,7 @@ var TSCommonMark;
         constructor() {
             this.root = new LiteNode();
         }
-        toDOM() { return this.root.toDOM(); }
+        toDOM(node) { return this.root.toDOM(node); }
         toString() {
             return this.root.toString();
         }
@@ -114,6 +141,56 @@ var TSCommonMark;
             });
             return this;
         }
+        lineType(line) {
+            if (line.match(/^\#{1,6}\s+/)) {
+                return CommonMarkTypes.HEADLINE;
+            }
+            if (line.match(/^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/)) {
+                return CommonMarkTypes.LINE;
+            }
+            if (line.match(/^ {0,3}\- /)) {
+                return CommonMarkTypes.ULIST;
+            }
+            if (line.match(/^\>{0,1}(\t|    | {1,3}\t)/)) {
+                return CommonMarkTypes.CODE;
+            }
+            if (!line) {
+                return CommonMarkTypes.NONE;
+            }
+            return CommonMarkTypes.PARAGRAPH;
+        }
+        parseInline(line) {
+            const nodes = [];
+            const data = this.parseAnchor(line);
+            if (data.prev) {
+                nodes.push(new LiteTextNode(data.prev));
+            }
+            if (data.anchor) {
+                nodes.push(data.anchor);
+            }
+            if (data.next) {
+                nodes.push(new LiteTextNode(data.next));
+            }
+            return nodes;
+        }
+        parseAnchor(line) {
+            const r = /\[(.+?)\]\((.*?)\)/g;
+            const match = r.exec(line);
+            if (!match) {
+                return { prev: line };
+            }
+            const data = {};
+            if (match.index) {
+                data.prev = line.substr(0, match.index);
+            }
+            if (r.lastIndex < line.length) {
+                data.next = line.substr(r.lastIndex);
+            }
+            data.anchor = new LiteNode('a', { oneLine: true });
+            data.anchor.setAttribute('href', match[2] || '');
+            data.anchor.appendChild(new LiteTextNode(match[1] || ''));
+            return data;
+        }
         addHeadline(now, line) {
             this.initStack();
             const [lv, title] = line.split(/\s+/, 2);
@@ -148,7 +225,7 @@ var TSCommonMark;
                 line = '\n' + line;
             }
             const proot = this.lastStack();
-            proot.appendChild(new LiteTextNode(line));
+            proot.appendChild(this.parseInline(line));
         }
         addCodeBlock(now, line) {
             let softtab = !!line.match(/^\>/);
@@ -191,32 +268,14 @@ var TSCommonMark;
         lastStack() {
             return this.stack[this.stack.length - 1];
         }
-        lineType(line) {
-            if (line.match(/^\#{1,6}\s+/)) {
-                return CommonMarkTypes.HEADLINE;
-            }
-            if (line.match(/^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/)) {
-                return CommonMarkTypes.LINE;
-            }
-            if (line.match(/^ {0,3}\- /)) {
-                return CommonMarkTypes.ULIST;
-            }
-            if (line.match(/^\>{0,1}(\t|    | {1,3}\t)/)) {
-                return CommonMarkTypes.CODE;
-            }
-            if (!line) {
-                return CommonMarkTypes.NONE;
-            }
-            return CommonMarkTypes.PARAGRAPH;
-        }
     }
     TSCommonMark.CommonMark = CommonMark;
     function parse2String(source) {
         return new CommonMark().parse(source).toString();
     }
     TSCommonMark.parse2String = parse2String;
-    function parse2DOMTree(source) {
-        return new CommonMark().parse(source).toDOM();
+    function parse2DOMTree(source, node) {
+        return new CommonMark().parse(source).toDOM(node);
     }
     TSCommonMark.parse2DOMTree = parse2DOMTree;
 })(TSCommonMark || (TSCommonMark = {}));

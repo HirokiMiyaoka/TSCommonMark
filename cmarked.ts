@@ -9,6 +9,7 @@ module TSCommonMark
 		NONE,
 		HEADLINE,
 		PARAGRAPH,
+		ANCHOR,
 		CODE,
 		ULIST,
 		LINE,
@@ -63,6 +64,7 @@ module TSCommonMark
 	class LiteNode extends LiteNodeBase
 	{
 		private childlen: LiteNodeBase[];
+		private attribute: { [ key: string ]: string };
 		private newLineBegin: boolean;
 		private newLine: boolean;
 
@@ -70,20 +72,42 @@ module TSCommonMark
 		{
 			super( tag, option );
 			this.childlen = [];
+			this.attribute = {};
 			this.newLineBegin = !!option.newLineBegin;
 			this.newLine = !option.oneLine;
 		}
 
-		public appendChild( child: LiteNodeBase )
+		public appendChild( children: LiteNodeBase | LiteNodeBase[] )
 		{
-			this.childlen.push( child );
+			if ( Array.isArray( children ) )
+			{
+				children.forEach( ( child ) => { this.childlen.push( child ); } );
+			} else
+			{
+				this.childlen.push( children );
+			}
+		}
+
+		public setAttribute( key: string, value: string )
+		{
+			this.attribute[ key ] = value;
 		}
 
 		public toString(): string
 		{
 			if ( !this.tag ) { return this.toStringChildren(); }
 			if ( !this.close ) { return '<' + this.tag + ' />' + ( this.newLine ? '\n' : '' );}
-			return '<' + this.tag + '>' + ( this.newLineBegin ? '\n' : '' ) + this.toStringChildren() + '</' + this.tag + '>' + ( this.newLine ? '\n' : '' );
+			return '<' + this.tag + this.toStringAttribute() + '>' + ( this.newLineBegin ? '\n' : '' ) + this.toStringChildren() + '</' + this.tag + '>' + ( this.newLine ? '\n' : '' );
+		}
+
+		private toStringAttribute(): string
+		{
+			const keys = Object.keys( this.attribute );
+			if ( keys.length <= 0 ) { return ''; }
+			return ' ' + keys.map( ( key ) =>
+			{
+				return key + '="' + (this.attribute[ key ] || '').replace( /\"/g, '&quot;' ) + '"';
+			} ).join( ' ' );
 		}
 
 		private toStringChildren(): string
@@ -91,9 +115,19 @@ module TSCommonMark
 			return this.childlen.map( ( child ) => { return child.toString() } ) . join( '' );
 		}
 
-		public toDOM(): HTMLElement | Text
+		public toDOM( node?: HTMLElement ): HTMLElement | Text
 		{
-			const root = document.createElement( this.tag || 'div' );
+			const root = node || document.createElement( this.tag || 'div' );
+			Object.keys( this.attribute ).forEach( ( key ) =>
+			{
+				if ( key === 'class' )
+				{
+					root.classList.add( ... this.attribute.class.split( ' ' ) );
+				} else
+				{
+					(<any>root)[ key ] = this.attribute[ key ];
+				}
+			} );
 			this.childlen.forEach( ( child ) =>
 			{
 				root.appendChild( child.toDOM() );
@@ -112,7 +146,7 @@ module TSCommonMark
 			this.root = new LiteNode();
 		}
 
-		public toDOM() { return this.root.toDOM(); }
+		public toDOM( node?: HTMLElement ) { return this.root.toDOM( node ); }
 
 		public toString(): string
 		{
@@ -168,6 +202,57 @@ module TSCommonMark
 			return this;
 		}
 
+		private lineType( line: string ): CommonMarkTypes
+		{
+			// Headline
+			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
+
+			// Line
+			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
+
+			// List
+			if ( line.match( /^ {0,3}\- / ) ) { return CommonMarkTypes.ULIST; }
+
+			// Code block
+			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
+
+			// No line
+			if ( !line ) { return CommonMarkTypes.NONE; }
+			
+			return CommonMarkTypes.PARAGRAPH;
+		}
+
+		private parseInline( line: string )
+		{
+			const nodes: LiteNodeBase[] = [];
+			const data = this.parseAnchor( line );
+
+			if ( data.prev ) { nodes.push( new LiteTextNode( data.prev ) ); }
+			if ( data.anchor ) { nodes.push( data.anchor ); }
+			if ( data.next ) { nodes.push( new LiteTextNode( data.next ) ); }
+
+			return nodes;
+		}
+
+		private parseAnchor( line: string ): { prev?: string, anchor?: LiteNode, next?: string }
+		{
+			const r = /\[(.+?)\]\((.*?)\)/g;
+			const match = r.exec( line );
+
+			if ( !match ) { return { prev: line }; }
+
+			const data: { prev?: string, anchor?: LiteNode, next?: string } = {};
+
+			if ( match.index ) { data.prev = line.substr( 0, match.index ); }
+			if ( r.lastIndex < line.length ) { data.next = line.substr( r.lastIndex ); }
+
+			data.anchor = new LiteNode( 'a', { oneLine: true } );
+			data.anchor.setAttribute( 'href', match[ 2 ] || '' );
+			data.anchor.appendChild( new LiteTextNode( match[ 1 ] || '' ) );
+
+			return data;
+		}
+
 		private addHeadline( now: CommonMarkTypes, line: string )
 		{
 			this.initStack();
@@ -205,7 +290,7 @@ module TSCommonMark
 			} else { line = '\n' + line; }
 
 			const proot = this.lastStack();
-			proot.appendChild( new LiteTextNode( line ) );
+			proot.appendChild( this.parseInline( line ) );
 		}
 
 		private addCodeBlock( now: CommonMarkTypes, line: string )
@@ -258,26 +343,6 @@ module TSCommonMark
 			return this.stack[ this.stack.length - 1 ];
 		}
 
-		private lineType( line: string ): CommonMarkTypes
-		{
-			// Headline
-			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
-
-			// Line
-			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
-
-			// List
-			if ( line.match( /^ {0,3}\- / ) ) { return CommonMarkTypes.ULIST; }
-
-			// Code block
-			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
-
-			// No line
-			if ( !line ) { return CommonMarkTypes.NONE; }
-			
-			return CommonMarkTypes.PARAGRAPH;
-		}
-
 	}
 
 	export function parse2String( source: string ): string
@@ -285,9 +350,9 @@ module TSCommonMark
 		return new CommonMark().parse( source ).toString();
 	}
 
-	export function parse2DOMTree( source: string ): HTMLElement
+	export function parse2DOMTree( source: string, node?: HTMLElement  ): HTMLElement
 	{
-		return <HTMLElement>new CommonMark().parse( source ).toDOM();
+		return <HTMLElement>new CommonMark().parse( source ).toDOM( node );
 	}
 
 }
