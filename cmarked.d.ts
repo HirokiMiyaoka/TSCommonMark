@@ -1,4 +1,15 @@
 declare module TSCommonMark {
+    interface TagOption {
+        newLineBegin?: boolean;
+        oneLine?: boolean;
+    }
+    class LiteNodeBase {
+        protected tag: string;
+        protected close: boolean;
+        constructor(tag: string, option?: TagOption);
+        toString(): string;
+        toDOM(): HTMLElement | Text;
+    }
     class CommonMark {
         private root;
         private stack;
@@ -7,7 +18,7 @@ declare module TSCommonMark {
         toString(): string;
         parse(source: string): this;
         private lineType(line);
-        private parseInline(line);
+        parseInline(line: string): LiteNodeBase[];
         private parseAnchor(line);
         private addHeadline(now, line);
         private addUList(now, line);
@@ -19,6 +30,8 @@ declare module TSCommonMark {
         private lastStack();
     }
     function parse2String(source: string): string;
+    function parseLine2String(line: string): string;
     function parse2DOMTree(source: string, node?: HTMLElement): HTMLElement;
+    function parseLine2DOMTree(line: string, node?: HTMLElement): HTMLElement;
 }
 export = TSCommonMark;

@@ -15,13 +15,13 @@ module TSCommonMark
 		LINE,
 	};
 
-	interface TagOption
+	export interface TagOption
 	{
 		newLineBegin?: boolean,
 		oneLine?: boolean
 	}
 
-	class LiteNodeBase
+	export class LiteNodeBase
 	{
 		protected tag: string;
 		protected close: boolean;
@@ -222,7 +222,7 @@ module TSCommonMark
 			return CommonMarkTypes.PARAGRAPH;
 		}
 
-		private parseInline( line: string )
+		public parseInline( line: string )
 		{
 			const nodes: LiteNodeBase[] = [];
 			const data = this.parseAnchor( line );
@@ -350,9 +350,25 @@ module TSCommonMark
 		return new CommonMark().parse( source ).toString();
 	}
 
-	export function parse2DOMTree( source: string, node?: HTMLElement  ): HTMLElement
+	export function parseLine2String( line: string ): string
+	{
+		const list = new CommonMark().parseInline( line );
+		return list.map( ( child ) => { return child.toString(); } ).join( '' );
+	}
+
+	export function parse2DOMTree( source: string, node?: HTMLElement ): HTMLElement
 	{
 		return <HTMLElement>new CommonMark().parse( source ).toDOM( node );
+	}
+
+	export function parseLine2DOMTree( line: string, node?: HTMLElement ): HTMLElement
+	{
+		const root = node || document.createElement( 'span' );
+		new CommonMark().parseInline( line ).forEach( ( child ) =>
+		{
+			root.appendChild( child.toDOM() );
+		} );
+		return root;
 	}
 
 }

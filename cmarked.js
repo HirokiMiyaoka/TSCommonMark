@@ -28,6 +28,7 @@ var TSCommonMark;
         }
         toDOM() { return document.createElement(this.tag); }
     }
+    TSCommonMark.LiteNodeBase = LiteNodeBase;
     class LiteTextNode extends LiteNodeBase {
         constructor(text, option = {}) {
             super('text', option);
@@ -274,9 +275,22 @@ var TSCommonMark;
         return new CommonMark().parse(source).toString();
     }
     TSCommonMark.parse2String = parse2String;
+    function parseLine2String(line) {
+        const list = new CommonMark().parseInline(line);
+        return list.map((child) => { return child.toString(); }).join('');
+    }
+    TSCommonMark.parseLine2String = parseLine2String;
     function parse2DOMTree(source, node) {
         return new CommonMark().parse(source).toDOM(node);
     }
     TSCommonMark.parse2DOMTree = parse2DOMTree;
+    function parseLine2DOMTree(line, node) {
+        const root = node || document.createElement('span');
+        new CommonMark().parseInline(line).forEach((child) => {
+            root.appendChild(child.toDOM());
+        });
+        return root;
+    }
+    TSCommonMark.parseLine2DOMTree = parseLine2DOMTree;
 })(TSCommonMark || (TSCommonMark = {}));
 module.exports = TSCommonMark;
