@@ -51,7 +51,13 @@ function Test( file )
 
 for( let i = 2 ; i < process.argv.length; ++i )
 {
-	if ( process.argv[ i ] ){}
+	switch ( process.argv[ i ] )
+	{
+		case '--t':
+			++i;
+			if ( process.argv[ i ] ) {  }
+			break;
+	}
 }
 
 let error = [];

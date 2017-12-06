@@ -112,6 +112,9 @@ var TSCommonMark;
                         type = CommonMarkTypes.NONE;
                     }
                 }
+                else if (ltype === CommonMarkTypes.LINE) {
+                    type = CommonMarkTypes.NONE;
+                }
                 else if (type === CommonMarkTypes.PARAGRAPH) {
                     this.addParagraph(type, line);
                     type = ltype;
@@ -162,23 +165,35 @@ var TSCommonMark;
         }
         parseInline(line) {
             const nodes = [];
-            const data = this.parseAnchor(line);
-            if (data.prev) {
-                nodes.push(new LiteTextNode(data.prev));
-            }
-            if (data.anchor) {
-                nodes.push(data.anchor);
-            }
+            let data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
+            data = this.margeInlineNodes(nodes, this.parseAnchor(data.next || ''), false);
             if (data.next) {
                 nodes.push(new LiteTextNode(data.next));
             }
             return nodes;
         }
-        parseAnchor(line) {
-            const r = /\[(.+?)\]\((.*?)\)/g;
+        margeInlineNodes(nodes, data, recrusion) {
+            if (data.prev) {
+                if (recrusion) {
+                    const pdata = this.parseInline(data.prev);
+                    nodes.push(...pdata);
+                }
+                else {
+                    nodes.push(new LiteTextNode(data.prev));
+                }
+                delete data.prev;
+            }
+            if (data.node) {
+                nodes.push(data.node);
+                delete data.node;
+            }
+            return data;
+        }
+        parseEmphasis(line) {
+            const r = /\*([^\*]+?)\*/g;
             const match = r.exec(line);
             if (!match) {
-                return { prev: line };
+                return { next: line };
             }
             const data = {};
             if (match.index) {
@@ -187,9 +202,26 @@ var TSCommonMark;
             if (r.lastIndex < line.length) {
                 data.next = line.substr(r.lastIndex);
             }
-            data.anchor = new LiteNode('a', { oneLine: true });
-            data.anchor.setAttribute('href', match[2] || '');
-            data.anchor.appendChild(new LiteTextNode(match[1] || ''));
+            data.node = new LiteNode('em', { oneLine: true });
+            data.node.appendChild(new LiteTextNode(match[1] || ''));
+            return data;
+        }
+        parseAnchor(line) {
+            const r = /\[(.+?)\]\((.*?)\)/g;
+            const match = r.exec(line);
+            if (!match) {
+                return { next: line };
+            }
+            const data = {};
+            if (match.index) {
+                data.prev = line.substr(0, match.index);
+            }
+            if (r.lastIndex < line.length) {
+                data.next = line.substr(r.lastIndex);
+            }
+            data.node = new LiteNode('a', { oneLine: true });
+            data.node.setAttribute('href', match[2] || '');
+            data.node.appendChild(new LiteTextNode(match[1] || ''));
             return data;
         }
         addHeadline(now, line) {
@@ -285,7 +317,7 @@ var TSCommonMark;
     }
     TSCommonMark.parse2DOMTree = parse2DOMTree;
     function parseLine2DOMTree(line, node) {
-        const root = node || document.createElement('span');
+        const root = node || document.createElement('p');
         new CommonMark().parseInline(line).forEach((child) => {
             root.appendChild(child.toDOM());
         });

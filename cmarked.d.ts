@@ -19,6 +19,8 @@ declare module TSCommonMark {
         parse(source: string): this;
         private lineType(line);
         parseInline(line: string): LiteNodeBase[];
+        private margeInlineNodes(nodes, data, recrusion);
+        private parseEmphasis(line);
         private parseAnchor(line);
         private addHeadline(now, line);
         private addUList(now, line);

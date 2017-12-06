@@ -15,6 +15,13 @@ module TSCommonMark
 		LINE,
 	};
 
+	interface InlineParseData
+	{
+		prev?: string,
+		node?: LiteNode,
+		next?: string,
+	}
+
 	export interface TagOption
 	{
 		newLineBegin?: boolean,
@@ -167,6 +174,9 @@ module TSCommonMark
 				if ( ltype === CommonMarkTypes.NONE )
 				{
 					if ( type === CommonMarkTypes.PARAGRAPH ) { type = CommonMarkTypes.NONE; }
+				} else if( ltype === CommonMarkTypes.LINE )
+				{
+					type = CommonMarkTypes.NONE;
 				} else if ( type === CommonMarkTypes.PARAGRAPH )
 				{
 					this.addParagraph( type, line );
@@ -225,30 +235,72 @@ module TSCommonMark
 		public parseInline( line: string )
 		{
 			const nodes: LiteNodeBase[] = [];
-			const data = this.parseAnchor( line );
 
-			if ( data.prev ) { nodes.push( new LiteTextNode( data.prev ) ); }
-			if ( data.anchor ) { nodes.push( data.anchor ); }
+			let data = this.margeInlineNodes( nodes, this.parseEmphasis( line ), false );
+			data = this.margeInlineNodes( nodes, this.parseAnchor( data.next || '' ), false );
+
 			if ( data.next ) { nodes.push( new LiteTextNode( data.next ) ); }
 
 			return nodes;
 		}
 
-		private parseAnchor( line: string ): { prev?: string, anchor?: LiteNode, next?: string }
+		private margeInlineNodes( nodes: LiteNodeBase[], data: InlineParseData, recrusion: boolean )
 		{
-			const r = /\[(.+?)\]\((.*?)\)/g;
+			if ( data.prev )
+			{
+				if ( recrusion )
+				{
+					const pdata = this.parseInline( data.prev );
+					nodes.push( ... pdata );
+				} else
+				{
+					nodes.push( new LiteTextNode( data.prev ) );
+				}
+				delete data.prev;
+			}
+
+			if ( data.node )
+			{
+				nodes.push( data.node );
+				delete data.node;
+			}
+
+			return data;
+		}
+
+		private parseEmphasis( line: string ): InlineParseData
+		{
+			const r = /\*([^\*]+?)\*/g;
 			const match = r.exec( line );
 
-			if ( !match ) { return { prev: line }; }
+			if ( !match ) { return { next: line }; }
 
-			const data: { prev?: string, anchor?: LiteNode, next?: string } = {};
+			const data: InlineParseData = {};
 
 			if ( match.index ) { data.prev = line.substr( 0, match.index ); }
 			if ( r.lastIndex < line.length ) { data.next = line.substr( r.lastIndex ); }
 
-			data.anchor = new LiteNode( 'a', { oneLine: true } );
-			data.anchor.setAttribute( 'href', match[ 2 ] || '' );
-			data.anchor.appendChild( new LiteTextNode( match[ 1 ] || '' ) );
+			data.node = new LiteNode( 'em', { oneLine: true } );
+			data.node.appendChild( new LiteTextNode( match[ 1 ] || '' ) );
+
+			return data;
+		}
+
+		private parseAnchor( line: string ): InlineParseData
+		{
+			const r = /\[(.+?)\]\((.*?)\)/g;
+			const match = r.exec( line );
+
+			if ( !match ) { return { next: line }; }
+
+			const data: InlineParseData = {};
+
+			if ( match.index ) { data.prev = line.substr( 0, match.index ); }
+			if ( r.lastIndex < line.length ) { data.next = line.substr( r.lastIndex ); }
+
+			data.node = new LiteNode( 'a', { oneLine: true } );
+			data.node.setAttribute( 'href', match[ 2 ] || '' );
+			data.node.appendChild( new LiteTextNode( match[ 1 ] || '' ) );
 
 			return data;
 		}
@@ -363,7 +415,7 @@ module TSCommonMark
 
 	export function parseLine2DOMTree( line: string, node?: HTMLElement ): HTMLElement
 	{
-		const root = node || document.createElement( 'span' );
+		const root = node || document.createElement( 'p' );
 		new CommonMark().parseInline( line ).forEach( ( child ) =>
 		{
 			root.appendChild( child.toDOM() );
