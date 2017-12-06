@@ -246,7 +246,7 @@ module TSCommonMark
 			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
 
 			// List
-			if ( line.match( /^ {0,3}\- / ) ) { return CommonMarkTypes.ULIST; }
+			if ( line.match( /^ {0,3}[\-\*] / ) ) { return CommonMarkTypes.ULIST; }
 
 			// Code block
 			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
@@ -356,7 +356,7 @@ module TSCommonMark
 				this.stack.push( root );
 			}
 			const item = new LiteNode( 'li' );
-			item.appendChild( new LiteTextNode( line.split( '- ', 2 )[ 1 ] ) );
+			item.appendChild( new LiteTextNode( line.split( /[\-\*] /, 2 )[ 1 ] ) );
 			this.lastStack().appendChild( item );
 		}
 

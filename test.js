@@ -49,19 +49,32 @@ function Test( file )
 	return true;
 }
 
+const tests = [];
 for( let i = 2 ; i < process.argv.length; ++i )
 {
 	switch ( process.argv[ i ] )
 	{
 		case '--t':
 			++i;
-			if ( process.argv[ i ] ) {  }
+			if ( process.argv[ i ] )
+			{
+				process.argv[ i ].split( ',' ).forEach( ( item ) =>
+				{
+					if ( !item.match( /[^\d]/ ) && item.length < 4 )
+					{
+						item = ('0000' + item).slice( -4 );
+					}
+					item += '.md';
+					if ( tests.indexOf( item ) < 0  ) { tests.push( item ); }
+				} );
+			}
 			break;
 	}
 }
 
 let error = [];
-const list = GetTestList();
+
+const list = 0 < tests.length ? tests : GetTestList();
 list.sort();
 for ( let i = MODE.begin ; i < list.length ; ++i )
 {
