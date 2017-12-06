@@ -8,6 +8,8 @@ module TSCommonMark
 	{
 		NONE,
 		HEADLINE,
+		HEADLINE1,
+		HEADLINE2,
 		PARAGRAPH,
 		ANCHOR,
 		CODE,
@@ -82,6 +84,11 @@ module TSCommonMark
 			this.attribute = {};
 			this.newLineBegin = !!option.newLineBegin;
 			this.newLine = !option.oneLine;
+		}
+
+		public changeTag( tag: string )
+		{
+			this.tag = tag;
 		}
 
 		public appendChild( children: LiteNodeBase | LiteNodeBase[] )
@@ -164,12 +171,20 @@ module TSCommonMark
 		{
 			this.initStack();
 
+			const lines = source.split( '\n' );
+
+			this.parseLines( lines );
+
+			return this;
+		}
+
+		private parseLines( lines: string[] )
+		{
 			let type: CommonMarkTypes = CommonMarkTypes.NONE;
 
-			const lines = source.split( '\n' );
-			lines.forEach( ( line ) =>
+			lines.forEach( ( line, index ) =>
 			{
-				const ltype = this.lineType( line );
+				const ltype = this.lineType( line, type );
 
 				if ( ltype === CommonMarkTypes.NONE )
 				{
@@ -177,6 +192,11 @@ module TSCommonMark
 				} else if( ltype === CommonMarkTypes.LINE )
 				{
 					type = CommonMarkTypes.NONE;
+				} else if( ltype === CommonMarkTypes.HEADLINE1 || ltype === CommonMarkTypes.HEADLINE2 )
+				{
+					this.addHeadlineSP( type, line );
+					type = CommonMarkTypes.NONE;
+					return;
 				} else if ( type === CommonMarkTypes.PARAGRAPH )
 				{
 					this.addParagraph( type, line );
@@ -208,14 +228,19 @@ module TSCommonMark
 					break;
 				}
 			} );
-
-			return this;
 		}
 
-		private lineType( line: string ): CommonMarkTypes
+		private lineType( line: string, type: number ): CommonMarkTypes
 		{
 			// Headline
 			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
+
+			// Special Headline
+			if ( type === CommonMarkTypes.PARAGRAPH )
+			{
+				if ( line.match( /^\={2,}$/ ) ) { return CommonMarkTypes.HEADLINE1; }
+				if ( line.match( /^\-{2,}$/ ) ) { return CommonMarkTypes.HEADLINE2; }
+			}
 
 			// Line
 			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
@@ -313,6 +338,12 @@ module TSCommonMark
 			root.appendChild( new LiteTextNode( title ) );
 			this.lastStack().appendChild( root );
 			this.stack.push( root );
+		}
+
+		private addHeadlineSP( now: CommonMarkTypes, line: string )
+		{
+			const last = this.lastStack();
+			last.changeTag( now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2' );
 		}
 
 		private addUList( now: CommonMarkTypes, line: string )

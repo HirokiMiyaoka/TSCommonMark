@@ -17,12 +17,14 @@ declare module TSCommonMark {
         toDOM(node?: HTMLElement): HTMLElement | Text;
         toString(): string;
         parse(source: string): this;
-        private lineType(line);
+        private parseLines(lines);
+        private lineType(line, type);
         parseInline(line: string): LiteNodeBase[];
         private margeInlineNodes(nodes, data, recrusion);
         private parseEmphasis(line);
         private parseAnchor(line);
         private addHeadline(now, line);
+        private addHeadlineSP(now, line);
         private addUList(now, line);
         private addParagraph(now, line);
         private addCodeBlock(now, line);
