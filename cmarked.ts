@@ -14,6 +14,7 @@ module TSCommonMark
 		ANCHOR,
 		CODE,
 		ULIST,
+		UITEM,
 		LINE,
 	};
 
@@ -48,6 +49,8 @@ module TSCommonMark
 			}
 		}
 
+		public changeOption( option: TagOption = {} ) {}
+
 		public toString(): string
 		{
 			return this.close ? '<' + this.tag + ' />' : [ '<', '></', '>' ].join( this.tag );
@@ -72,7 +75,7 @@ module TSCommonMark
 
 	class LiteNode extends LiteNodeBase
 	{
-		private childlen: LiteNodeBase[];
+		public childlen: LiteNodeBase[];
 		private attribute: { [ key: string ]: string };
 		private newLineBegin: boolean;
 		private newLine: boolean;
@@ -82,14 +85,20 @@ module TSCommonMark
 			super( tag, option );
 			this.childlen = [];
 			this.attribute = {};
-			this.newLineBegin = !!option.newLineBegin;
-			this.newLine = !option.oneLine;
+			this.newLineBegin = false;
+			this.newLine = true;
+			this.changeOption( option );
 		}
 
-		public changeTag( tag: string )
+		public changeOption( option: TagOption = {} )
 		{
-			this.tag = tag;
+			if ( option.newLineBegin !== undefined ) { this.newLineBegin = !!option.newLineBegin; }
+			if ( option.oneLine !== undefined ) { this.newLine = !option.oneLine; }
 		}
+
+		public getTag() { return this.tag; }
+
+		public changeTag( tag: string ) { this.tag = tag; }
 
 		public appendChild( children: LiteNodeBase | LiteNodeBase[] )
 		{
@@ -214,6 +223,9 @@ module TSCommonMark
 					this.addUList( type, line );
 					type = ltype;
 					break;
+				case CommonMarkTypes.UITEM:
+					this.addUListItem( type, line );
+					break;
 				case CommonMarkTypes.CODE:
 					this.addCodeBlock( type, line );
 					type = ltype;
@@ -232,6 +244,8 @@ module TSCommonMark
 
 		private lineType( line: string, type: number ): CommonMarkTypes
 		{
+			if ( this.inList() && line.match( /^\t/ ) ) { return CommonMarkTypes.UITEM; }
+
 			// Headline
 			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
 
@@ -255,6 +269,11 @@ module TSCommonMark
 			if ( !line ) { return CommonMarkTypes.NONE; }
 			
 			return CommonMarkTypes.PARAGRAPH;
+		}
+
+		private inList(): boolean
+		{
+			return this.lastStack().getTag() === 'ul';
 		}
 
 		public parseInline( line: string )
@@ -358,6 +377,27 @@ module TSCommonMark
 			const item = new LiteNode( 'li' );
 			item.appendChild( new LiteTextNode( line.split( /[\-\*] /, 2 )[ 1 ] ) );
 			this.lastStack().appendChild( item );
+		}
+
+		private addUListItem( now: CommonMarkTypes, line: string )
+		{
+			const ul = this.lastStack();
+			const lastli = <LiteNode>ul.childlen[ ul.childlen.length - 1 ];
+
+			if ( (<LiteNode>lastli.childlen[ lastli.childlen.length - 1 ]).getTag === undefined )
+			{
+				// Last li child is TextNode.
+
+				const textnode = <LiteTextNode>lastli.childlen[ lastli.childlen.length - 1 ];
+				const p = new LiteNode( 'p', { oneLine: false } );
+				p.appendChild( textnode );
+				lastli.childlen[ lastli.childlen.length - 1 ] = p;
+				lastli.changeOption( { newLineBegin: true, oneLine: false } );
+			}
+			line = line.replace( /^\t/, '' );
+			const p = new LiteNode( 'p', { oneLine: false } );
+			p.appendChild( new LiteTextNode( line ) );
+			lastli.appendChild( p );
 		}
 
 		private addParagraph( now: CommonMarkTypes, line: string )

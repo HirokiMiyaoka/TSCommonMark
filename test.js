@@ -54,7 +54,8 @@ for( let i = 2 ; i < process.argv.length; ++i )
 {
 	switch ( process.argv[ i ] )
 	{
-		case '--t':
+		case '--test':
+		case '-t':
 			++i;
 			if ( process.argv[ i ] )
 			{

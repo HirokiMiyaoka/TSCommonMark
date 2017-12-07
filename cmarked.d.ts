@@ -7,6 +7,7 @@ declare module TSCommonMark {
         protected tag: string;
         protected close: boolean;
         constructor(tag: string, option?: TagOption);
+        changeOption(option?: TagOption): void;
         toString(): string;
         toDOM(): HTMLElement | Text;
     }
@@ -19,6 +20,7 @@ declare module TSCommonMark {
         parse(source: string): this;
         private parseLines(lines);
         private lineType(line, type);
+        private inList();
         parseInline(line: string): LiteNodeBase[];
         private margeInlineNodes(nodes, data, recrusion);
         private parseEmphasis(line);
@@ -26,6 +28,7 @@ declare module TSCommonMark {
         private addHeadline(now, line);
         private addHeadlineSP(now, line);
         private addUList(now, line);
+        private addUListItem(now, line);
         private addParagraph(now, line);
         private addCodeBlock(now, line);
         private addLine(now, line);

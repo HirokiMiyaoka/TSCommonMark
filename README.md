@@ -33,7 +33,7 @@ npm run test
 ### Select
 
 ```
-npm run test -- --t TESTNAME|TESTNUMBER
+npm run test -- -t TESTNAME|TESTNUMBER
 ```
 
 Test `test/TESTNAME.md` or `test/TESTNUMBER.md` .
@@ -75,6 +75,32 @@ TypeScript用のCommonMarkのパーサーです。
 ちゃんと結果が正しく出力されていればOKとする。
 
 一応今回の目標であるCommonMarkのサンプルをテストとして使うので、答えの出力までちょっとがんばることにした（ので、一部やっていることは無駄があるが許して）。
+
+### サポートするスクリプト
+
+いくつかテストをサポートするスクリプトがある。
+開発者しか使わない関係上、ビルドしないと使えないので注意。
+
+* script/gettests.js
+    * 現在の最新のテストを、`newtest` に入れる。
+* script/difftests.js
+    * 現在のテストと、`newtest` にあるテストの比較を行う。
+
+#### ビルド方法
+
+```
+npm run script
+```
+
+#### 実行方法
+
+```
+node script/gettests.js
+```
+
+```
+node script/difftests.js
+```
 
 ## 進捗
 
