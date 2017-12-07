@@ -22,10 +22,28 @@ npm run build
 
 ## Test
 
-http://spec.commonmark.org/0.27/
+http://spec.commonmark.org/0.28/
+
+### All
 
 ```
 npm run test
+```
+
+### Select
+
+```
+npm run test -- --t TESTNAME|TESTNUMBER
+```
+
+Test `test/TESTNAME.md` or `test/TESTNUMBER.md` .
+
+If TESTNUMBER.length is less than 4 digits, 0 is added.
+
+```
+10    =>  0010 => test/0010.md
+1000  =>  1000 => test/1000.md
+10000 => 10000 => test/10000.md
 ```
 
 # TSCommonMark
@@ -60,9 +78,8 @@ TypeScript用のCommonMarkのパーサーです。
 
 ## 進捗
 
-* コードブロック記法に対応(一部)
+* とりあえず諸事情で一部使う必要があったので、460のリンクテストだけ先に追加した。
 
 ## 今後について
 
-今はもろもろの関係で、markedみたいに `cmarked` なる関数をエクスポートしているが、ここらへんもいろいろ変えていく。
-どうやって切り出すかとかは考え中。
+ブラウザ用、Node.js用の出力ができるようにしていきたい。

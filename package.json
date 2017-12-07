@@ -5,8 +5,12 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "script": "tsc --project script",
     "test": "node test.js"
   },
   "author": "Hiroki",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "8.0.55"
+  }
 }

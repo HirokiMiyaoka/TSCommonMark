@@ -62,7 +62,7 @@ for( let i = 2 ; i < process.argv.length; ++i )
 				{
 					if ( !item.match( /[^\d]/ ) && item.length < 4 )
 					{
-						item = ('0000' + item).slice( -4 );
+						item = ( '0000' + item ).slice( -4 );
 					}
 					item += '.md';
 					if ( tests.indexOf( item ) < 0  ) { tests.push( item ); }
