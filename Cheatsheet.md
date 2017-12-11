@@ -92,14 +92,16 @@ h2見出し
 #### ソース
 
 ```
-		test
+>		test
 ```
 
 #### 出力
 
 ```
+<blockquote>
 <pre><code>  test
 </code></pre>
+</blockquote>
 ```
 
 ## 

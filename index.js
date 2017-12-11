@@ -230,6 +230,103 @@ var TSCommonMark;
             }
             return last.getTag() === 'ul';
         }
+        addHeadline(now, line) {
+            const [lv, title] = line.split(/\s+/, 2);
+            const root = new LiteNode('h' + lv.length);
+            root.appendChild(new LiteTextNode(title));
+            this.root.appendChild(root);
+        }
+        addHeadlineSP(now, line) {
+            const last = this.lastNode();
+            last.changeTag(now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2');
+        }
+        addUList(now, line) {
+            if (now === CommonMarkTypes.ULIST) {
+                return;
+            }
+            const root = new LiteNode('ul', { newLineBegin: true });
+            this.root.appendChild(root);
+        }
+        addUListItem(now, line) {
+            const item = new LiteNode('li');
+            item.appendChild(new LiteTextNode(line.split(/[\-\*] /, 2)[1]));
+            this.innermostNode(this.lastNode(), 'ul').appendChild(item);
+        }
+        appendUListItem(now, line) {
+            const lastli = this.innermostNode(this.lastNode(), 'li');
+            if (lastli.childlen[lastli.childlen.length - 1].getTag === undefined) {
+                const textnode = lastli.childlen[lastli.childlen.length - 1];
+                const p = new LiteNode('p', { oneLine: false });
+                p.appendChild(textnode);
+                lastli.childlen[lastli.childlen.length - 1] = p;
+                lastli.changeOption({ newLineBegin: true, oneLine: false });
+            }
+            line = line.replace(/^\t/, '');
+            const p = new LiteNode('p', { oneLine: false });
+            p.appendChild(new LiteTextNode(line));
+            lastli.appendChild(p);
+        }
+        addParagraph(now, line) {
+            line = line.replace(/^\s+/, '');
+            if (!line) {
+                return;
+            }
+            if (now !== CommonMarkTypes.PARAGRAPH) {
+                const root = new LiteNode('p');
+                this.root.appendChild(root);
+            }
+            else {
+                line = '\n' + line;
+            }
+            const proot = this.lastNode();
+            proot.appendChild(new CommonMarkInline().parseInline(line));
+        }
+        addCodeBlock(now, line) {
+            let softtab = !!line.match(/^\>/);
+            line += '\n';
+            if (now !== CommonMarkTypes.CODE) {
+                let root = new LiteNode('pre');
+                const coderoot = new LiteNode('code', { oneLine: true });
+                root.appendChild(coderoot);
+                if (line.match(/^\>/)) {
+                    const r = new LiteNode('blockquote', { newLineBegin: true });
+                    r.appendChild(root);
+                    root = r;
+                }
+                this.root.appendChild(root);
+            }
+            line = line.replace(/^\>{0,1}(\t|    | {1,3}\t)/, '');
+            if (softtab) {
+                line = line.replace('\t', '  ');
+            }
+            const coderoot = this.innermostNode(this.lastNode(), 'code');
+            coderoot.appendChild(new LiteTextNode(line));
+        }
+        addHorizon(now, line) {
+            const root = new LiteNode('hr');
+            this.root.appendChild(root);
+        }
+    }
+    TSCommonMark.CommonMark = CommonMark;
+    class CommonMarkInline {
+        constructor() { }
+        parse(line) {
+            const nodes = this.parseInline(line);
+            return {
+                toString: () => { return this.toString(nodes); },
+                toDOM: (node) => { return this.toDOM(nodes, node); },
+            };
+        }
+        toString(nodes) {
+            return nodes.map((child) => { return child.toString(); }).join('');
+        }
+        toDOM(nodes, node) {
+            const root = node || document.createElement('p');
+            nodes.forEach((child) => {
+                root.appendChild(child.toDOM());
+            });
+            return root;
+        }
         parseInline(line) {
             const nodes = [];
             let data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
@@ -291,91 +388,13 @@ var TSCommonMark;
             data.node.appendChild(new LiteTextNode(match[1] || ''));
             return data;
         }
-        addHeadline(now, line) {
-            const [lv, title] = line.split(/\s+/, 2);
-            const root = new LiteNode('h' + lv.length);
-            root.appendChild(new LiteTextNode(title));
-            this.root.appendChild(root);
-        }
-        addHeadlineSP(now, line) {
-            const last = this.lastNode();
-            last.changeTag(now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2');
-        }
-        addUList(now, line) {
-            if (now === CommonMarkTypes.ULIST) {
-                return;
-            }
-            const root = new LiteNode('ul', { newLineBegin: true });
-            this.root.appendChild(root);
-        }
-        addUListItem(now, line) {
-            const item = new LiteNode('li');
-            item.appendChild(new LiteTextNode(line.split(/[\-\*] /, 2)[1]));
-            this.innermostNode(this.lastNode(), 'ul').appendChild(item);
-        }
-        appendUListItem(now, line) {
-            const lastli = this.innermostNode(this.lastNode(), 'li');
-            if (lastli.childlen[lastli.childlen.length - 1].getTag === undefined) {
-                const textnode = lastli.childlen[lastli.childlen.length - 1];
-                const p = new LiteNode('p', { oneLine: false });
-                p.appendChild(textnode);
-                lastli.childlen[lastli.childlen.length - 1] = p;
-                lastli.changeOption({ newLineBegin: true, oneLine: false });
-            }
-            line = line.replace(/^\t/, '');
-            const p = new LiteNode('p', { oneLine: false });
-            p.appendChild(new LiteTextNode(line));
-            lastli.appendChild(p);
-        }
-        addParagraph(now, line) {
-            line = line.replace(/^\s+/, '');
-            if (!line) {
-                return;
-            }
-            if (now !== CommonMarkTypes.PARAGRAPH) {
-                const root = new LiteNode('p');
-                this.root.appendChild(root);
-            }
-            else {
-                line = '\n' + line;
-            }
-            const proot = this.lastNode();
-            proot.appendChild(this.parseInline(line));
-        }
-        addCodeBlock(now, line) {
-            let softtab = !!line.match(/^\>/);
-            line += '\n';
-            if (now !== CommonMarkTypes.CODE) {
-                let root = new LiteNode('pre');
-                const coderoot = new LiteNode('code', { oneLine: true });
-                root.appendChild(coderoot);
-                if (line.match(/^\>/)) {
-                    const r = new LiteNode('blockquote', { newLineBegin: true });
-                    r.appendChild(root);
-                    root = r;
-                }
-                this.root.appendChild(root);
-            }
-            line = line.replace(/^\>{0,1}(\t|    | {1,3}\t)/, '');
-            if (softtab) {
-                line = line.replace('\t', '  ');
-            }
-            const coderoot = this.innermostNode(this.lastNode(), 'code');
-            coderoot.appendChild(new LiteTextNode(line));
-        }
-        addHorizon(now, line) {
-            const root = new LiteNode('hr');
-            this.root.appendChild(root);
-        }
     }
-    TSCommonMark.CommonMark = CommonMark;
     function parse2String(source) {
         return new CommonMark().parse(source).toString();
     }
     TSCommonMark.parse2String = parse2String;
     function parseLine2String(line) {
-        const list = new CommonMark().parseInline(line);
-        return list.map((child) => { return child.toString(); }).join('');
+        return new CommonMarkInline().parse(line).toString();
     }
     TSCommonMark.parseLine2String = parseLine2String;
     function parse2DOMTree(source, node) {
@@ -384,10 +403,7 @@ var TSCommonMark;
     TSCommonMark.parse2DOMTree = parse2DOMTree;
     function parseLine2DOMTree(line, node) {
         const root = node || document.createElement('p');
-        new CommonMark().parseInline(line).forEach((child) => {
-            root.appendChild(child.toDOM());
-        });
-        return root;
+        return new CommonMarkInline().parse(line).toDOM(node);
     }
     TSCommonMark.parseLine2DOMTree = parseLine2DOMTree;
 })(TSCommonMark || (TSCommonMark = {}));

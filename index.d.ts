@@ -24,10 +24,6 @@ declare module TSCommonMark {
         private innermostNode(node, tag?);
         private _innermostNode(node, tag?);
         private inList();
-        parseInline(line: string): LiteNodeBase[];
-        private margeInlineNodes(nodes, data, recrusion);
-        private parseEmphasis(line);
-        private parseAnchor(line);
         private addHeadline(now, line);
         private addHeadlineSP(now, line);
         private addUList(now, line);

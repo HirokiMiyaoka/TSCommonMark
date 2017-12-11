@@ -260,67 +260,6 @@ var TSCommonMark;
             }
             return last.getTag() === 'ul';
         };
-        CommonMark.prototype.parseInline = function (line) {
-            var nodes = [];
-            var data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
-            data = this.margeInlineNodes(nodes, this.parseAnchor(data.next || ''), false);
-            if (data.next) {
-                nodes.push(new LiteTextNode(data.next));
-            }
-            return nodes;
-        };
-        CommonMark.prototype.margeInlineNodes = function (nodes, data, recrusion) {
-            if (data.prev) {
-                if (recrusion) {
-                    var pdata = this.parseInline(data.prev);
-                    nodes.push.apply(nodes, pdata);
-                }
-                else {
-                    nodes.push(new LiteTextNode(data.prev));
-                }
-                delete data.prev;
-            }
-            if (data.node) {
-                nodes.push(data.node);
-                delete data.node;
-            }
-            return data;
-        };
-        CommonMark.prototype.parseEmphasis = function (line) {
-            var r = /\*([^\*]+?)\*/g;
-            var match = r.exec(line);
-            if (!match) {
-                return { next: line };
-            }
-            var data = {};
-            if (match.index) {
-                data.prev = line.substr(0, match.index);
-            }
-            if (r.lastIndex < line.length) {
-                data.next = line.substr(r.lastIndex);
-            }
-            data.node = new LiteNode('em', { oneLine: true });
-            data.node.appendChild(new LiteTextNode(match[1] || ''));
-            return data;
-        };
-        CommonMark.prototype.parseAnchor = function (line) {
-            var r = /\[(.+?)\]\((.*?)\)/g;
-            var match = r.exec(line);
-            if (!match) {
-                return { next: line };
-            }
-            var data = {};
-            if (match.index) {
-                data.prev = line.substr(0, match.index);
-            }
-            if (r.lastIndex < line.length) {
-                data.next = line.substr(r.lastIndex);
-            }
-            data.node = new LiteNode('a', { oneLine: true });
-            data.node.setAttribute('href', match[2] || '');
-            data.node.appendChild(new LiteTextNode(match[1] || ''));
-            return data;
-        };
         CommonMark.prototype.addHeadline = function (now, line) {
             var _a = line.split(/\s+/, 2), lv = _a[0], title = _a[1];
             var root = new LiteNode('h' + lv.length);
@@ -370,7 +309,7 @@ var TSCommonMark;
                 line = '\n' + line;
             }
             var proot = this.lastNode();
-            proot.appendChild(this.parseInline(line));
+            proot.appendChild(new CommonMarkInline().parseInline(line));
         };
         CommonMark.prototype.addCodeBlock = function (now, line) {
             var softtab = !!line.match(/^\>/);
@@ -400,13 +339,96 @@ var TSCommonMark;
         return CommonMark;
     }());
     TSCommonMark.CommonMark = CommonMark;
+    var CommonMarkInline = (function () {
+        function CommonMarkInline() {
+        }
+        CommonMarkInline.prototype.parse = function (line) {
+            var _this = this;
+            var nodes = this.parseInline(line);
+            return {
+                toString: function () { return _this.toString(nodes); },
+                toDOM: function (node) { return _this.toDOM(nodes, node); },
+            };
+        };
+        CommonMarkInline.prototype.toString = function (nodes) {
+            return nodes.map(function (child) { return child.toString(); }).join('');
+        };
+        CommonMarkInline.prototype.toDOM = function (nodes, node) {
+            var root = node || document.createElement('p');
+            nodes.forEach(function (child) {
+                root.appendChild(child.toDOM());
+            });
+            return root;
+        };
+        CommonMarkInline.prototype.parseInline = function (line) {
+            var nodes = [];
+            var data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
+            data = this.margeInlineNodes(nodes, this.parseAnchor(data.next || ''), false);
+            if (data.next) {
+                nodes.push(new LiteTextNode(data.next));
+            }
+            return nodes;
+        };
+        CommonMarkInline.prototype.margeInlineNodes = function (nodes, data, recrusion) {
+            if (data.prev) {
+                if (recrusion) {
+                    var pdata = this.parseInline(data.prev);
+                    nodes.push.apply(nodes, pdata);
+                }
+                else {
+                    nodes.push(new LiteTextNode(data.prev));
+                }
+                delete data.prev;
+            }
+            if (data.node) {
+                nodes.push(data.node);
+                delete data.node;
+            }
+            return data;
+        };
+        CommonMarkInline.prototype.parseEmphasis = function (line) {
+            var r = /\*([^\*]+?)\*/g;
+            var match = r.exec(line);
+            if (!match) {
+                return { next: line };
+            }
+            var data = {};
+            if (match.index) {
+                data.prev = line.substr(0, match.index);
+            }
+            if (r.lastIndex < line.length) {
+                data.next = line.substr(r.lastIndex);
+            }
+            data.node = new LiteNode('em', { oneLine: true });
+            data.node.appendChild(new LiteTextNode(match[1] || ''));
+            return data;
+        };
+        CommonMarkInline.prototype.parseAnchor = function (line) {
+            var r = /\[(.+?)\]\((.*?)\)/g;
+            var match = r.exec(line);
+            if (!match) {
+                return { next: line };
+            }
+            var data = {};
+            if (match.index) {
+                data.prev = line.substr(0, match.index);
+            }
+            if (r.lastIndex < line.length) {
+                data.next = line.substr(r.lastIndex);
+            }
+            data.node = new LiteNode('a', { oneLine: true });
+            data.node.setAttribute('href', match[2] || '');
+            data.node.appendChild(new LiteTextNode(match[1] || ''));
+            return data;
+        };
+        return CommonMarkInline;
+    }());
     function parse2String(source) {
         return new CommonMark().parse(source).toString();
     }
     TSCommonMark.parse2String = parse2String;
     function parseLine2String(line) {
-        var list = new CommonMark().parseInline(line);
-        return list.map(function (child) { return child.toString(); }).join('');
+        return new CommonMarkInline().parse(line).toString();
     }
     TSCommonMark.parseLine2String = parseLine2String;
     function parse2DOMTree(source, node) {
@@ -415,10 +437,7 @@ var TSCommonMark;
     TSCommonMark.parse2DOMTree = parse2DOMTree;
     function parseLine2DOMTree(line, node) {
         var root = node || document.createElement('p');
-        new CommonMark().parseInline(line).forEach(function (child) {
-            root.appendChild(child.toDOM());
-        });
-        return root;
+        return new CommonMarkInline().parse(line).toDOM(node);
     }
     TSCommonMark.parseLine2DOMTree = parseLine2DOMTree;
 })(TSCommonMark || (TSCommonMark = {}));
