@@ -13,13 +13,16 @@ declare module TSCommonMark {
     }
     class CommonMark {
         private root;
-        private stack;
         constructor();
         toDOM(node?: HTMLElement): HTMLElement | Text;
         toString(): string;
         parse(source: string): this;
         private parseLines(lines);
+        private addLine(ltype, type, line);
         private lineType(line, type);
+        private lastNode(node?);
+        private innermostNode(node, tag?);
+        private _innermostNode(node, tag?);
         private inList();
         parseInline(line: string): LiteNodeBase[];
         private margeInlineNodes(nodes, data, recrusion);
@@ -29,12 +32,10 @@ declare module TSCommonMark {
         private addHeadlineSP(now, line);
         private addUList(now, line);
         private addUListItem(now, line);
+        private appendUListItem(now, line);
         private addParagraph(now, line);
         private addCodeBlock(now, line);
-        private addLine(now, line);
-        private popStack();
-        private initStack();
-        private lastStack();
+        private addHorizon(now, line);
     }
     function parse2String(source: string): string;
     function parseLine2String(line: string): string;

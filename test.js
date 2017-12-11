@@ -9,6 +9,19 @@ const MODE =
 	begin: 0,
 };
 
+const COLOR =
+{
+	BLACK:   '\u001b[30m',
+	RED:     '\u001b[31m',
+	GREEN:   '\u001b[32m',
+	YELLOW:  '\u001b[33m',
+	BLUE:    '\u001b[34m',
+	MAGENTA: '\u001b[35m',
+	CYAN:    '\u001b[36m',
+	WHITE:   '\u001b[37m',
+	RESET:   '\u001b[0m',
+};
+
 function ExistsText( file )
 {
 	if ( !file.match( /\.md$/ ) ) { return false; }
@@ -33,7 +46,7 @@ function Test( file )
 
 	if ( compiled !== result )
 	{
-		console.log( 'Error:', file.replace( '.md', '' ) );
+		console.log( COLOR.RED + 'Error:' + COLOR.RESET, file.replace( '.md', '' ) );
 		if ( MODE.outputErrorInfo )
 		{
 			console.log( 'Source:' );
@@ -45,7 +58,7 @@ function Test( file )
 		}
 		return false;
 	}
-	console.log( 'Success:', file.replace( '.md', '' ) );
+	console.log( COLOR.GREEN + 'Success:' + COLOR.RESET, file.replace( '.md', '' ) );
 	return true;
 }
 

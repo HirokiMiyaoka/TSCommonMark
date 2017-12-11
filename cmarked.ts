@@ -15,7 +15,7 @@ module TSCommonMark
 		CODE,
 		ULIST,
 		UITEM,
-		LINE,
+		HORIZON,
 	};
 
 	interface InlineParseData
@@ -162,7 +162,7 @@ module TSCommonMark
 	export class CommonMark
 	{
 		private root: LiteNode;
-		private stack: LiteNode[];
+		//private stack: LiteNode[];
 
 		constructor()
 		{
@@ -178,8 +178,6 @@ module TSCommonMark
 
 		public parse( source: string )
 		{
-			this.initStack();
-
 			const lines = source.split( '\n' );
 
 			this.parseLines( lines );
@@ -198,7 +196,7 @@ module TSCommonMark
 				if ( ltype === CommonMarkTypes.NONE )
 				{
 					if ( type === CommonMarkTypes.PARAGRAPH ) { type = CommonMarkTypes.NONE; }
-				} else if( ltype === CommonMarkTypes.LINE )
+				} else if( ltype === CommonMarkTypes.HORIZON )
 				{
 					type = CommonMarkTypes.NONE;
 				} else if( ltype === CommonMarkTypes.HEADLINE1 || ltype === CommonMarkTypes.HEADLINE2 )
@@ -213,33 +211,35 @@ module TSCommonMark
 					return;
 				}
 
-				switch ( ltype )
-				{
+				type = this.addLine( ltype, type, line );
+			} );
+		}
+
+		private addLine( ltype: CommonMarkTypes, type: CommonMarkTypes, line: string )
+		{
+			switch ( ltype )
+			{
 				case CommonMarkTypes.HEADLINE:
 					this.addHeadline( type, line );
-					type = CommonMarkTypes.NONE;
-					break;
+					return CommonMarkTypes.NONE;
 				case CommonMarkTypes.ULIST:
 					this.addUList( type, line );
-					type = ltype;
-					break;
-				case CommonMarkTypes.UITEM:
 					this.addUListItem( type, line );
+					return ltype;
+				case CommonMarkTypes.UITEM:
+					this.appendUListItem( type, line );
 					break;
 				case CommonMarkTypes.CODE:
 					this.addCodeBlock( type, line );
-					type = ltype;
-					break;
+					return ltype;
 				case CommonMarkTypes.PARAGRAPH:
 					this.addParagraph( type, line );
-					type = ltype;
-					break;
-				case CommonMarkTypes.LINE:
-					this.addLine( type, line );
-					type = CommonMarkTypes.NONE;
-					break;
-				}
-			} );
+					return ltype;
+				case CommonMarkTypes.HORIZON:
+					this.addHorizon( type, line );
+					return CommonMarkTypes.NONE;
+			}
+			return type;
 		}
 
 		private lineType( line: string, type: number ): CommonMarkTypes
@@ -257,7 +257,7 @@ module TSCommonMark
 			}
 
 			// Line
-			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.LINE; }
+			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.HORIZON; }
 
 			// List
 			if ( line.match( /^ {0,3}[\-\*] / ) ) { return CommonMarkTypes.ULIST; }
@@ -267,13 +267,44 @@ module TSCommonMark
 
 			// No line
 			if ( !line ) { return CommonMarkTypes.NONE; }
-			
+
 			return CommonMarkTypes.PARAGRAPH;
+		}
+
+		private lastNode( node: LiteNode = this.root ): LiteNode|null
+		{
+			return <LiteNode>node.childlen[ this.root.childlen.length - 1 ];
+		}
+
+		private innermostNode( node: LiteNode|null, tag?: string )
+		{
+			const result = this._innermostNode( node, tag );
+			if ( result === null ) { return node; }
+			return result;
+		}
+
+		private _innermostNode( node: LiteNode|null, tag?: string ): LiteNode|null
+		{
+			// Text Node
+			if ( !node || node.childlen === undefined ) { return null; }
+
+			if ( node.getTag() === tag )
+			{
+				const last = this._innermostNode( <LiteNode>this.lastNode( node ), tag ) || node;
+				return node;
+			} else
+			{
+				// Last LiteNode
+				if ( node.childlen.length <= 0 ) { return node; }
+			}
+			return this._innermostNode( <LiteNode>this.lastNode( node ), tag );
 		}
 
 		private inList(): boolean
 		{
-			return this.lastStack().getTag() === 'ul';
+			const last = this.lastNode();
+			if ( !last || last.getTag === undefined ) { return false; }
+			return last.getTag() === 'ul';
 		}
 
 		public parseInline( line: string )
@@ -351,38 +382,35 @@ module TSCommonMark
 
 		private addHeadline( now: CommonMarkTypes, line: string )
 		{
-			this.initStack();
 			const [ lv, title ] = line.split( /\s+/, 2 );
 			const root = new LiteNode( 'h' + lv.length );
 			root.appendChild( new LiteTextNode( title ) );
-			this.lastStack().appendChild( root );
-			this.stack.push( root );
+			this.root.appendChild( root );
 		}
 
 		private addHeadlineSP( now: CommonMarkTypes, line: string )
 		{
-			const last = this.lastStack();
+			const last = <LiteNode>this.lastNode();
 			last.changeTag( now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2' );
 		}
 
 		private addUList( now: CommonMarkTypes, line: string )
 		{
-			if ( now !== CommonMarkTypes.ULIST )
-			{
-				this.popStack(); // TODO:
-				const root = new LiteNode( 'ul', { newLineBegin: true } );
-				this.lastStack().appendChild( root );
-				this.stack.push( root );
-			}
-			const item = new LiteNode( 'li' );
-			item.appendChild( new LiteTextNode( line.split( /[\-\*] /, 2 )[ 1 ] ) );
-			this.lastStack().appendChild( item );
+			if ( now === CommonMarkTypes.ULIST ) { return; }
+			const root = new LiteNode( 'ul', { newLineBegin: true } );
+			this.root.appendChild( root );
 		}
 
 		private addUListItem( now: CommonMarkTypes, line: string )
 		{
-			const ul = this.lastStack();
-			const lastli = <LiteNode>ul.childlen[ ul.childlen.length - 1 ];
+			const item = new LiteNode( 'li' );
+			item.appendChild( new LiteTextNode( line.split( /[\-\*] /, 2 )[ 1 ] ) );
+			(<LiteNode>this.innermostNode( this.lastNode(), 'ul' )).appendChild( item );//TODO:
+		}
+
+		private appendUListItem( now: CommonMarkTypes, line: string )
+		{
+			const lastli = <LiteNode>this.innermostNode( this.lastNode(), 'li' );
 
 			if ( (<LiteNode>lastli.childlen[ lastli.childlen.length - 1 ]).getTag === undefined )
 			{
@@ -406,13 +434,11 @@ module TSCommonMark
 			if ( !line ) { return; }
 			if ( now !== CommonMarkTypes.PARAGRAPH )
 			{
-				this.initStack();
 				const root = new LiteNode( 'p' );
-				this.lastStack().appendChild( root );
-				this.stack.push( root );
+				this.root.appendChild( root );
 			} else { line = '\n' + line; }
 
-			const proot = this.lastStack();
+			const proot = <LiteNode>this.lastNode();
 			proot.appendChild( this.parseInline( line ) );
 		}
 
@@ -422,7 +448,6 @@ module TSCommonMark
 			line += '\n';
 			if ( now !== CommonMarkTypes.CODE )
 			{
-				this.popStack();
 				let root = new LiteNode( 'pre' );
 				const coderoot = new LiteNode( 'code', { oneLine: true } );
 				root.appendChild( coderoot );
@@ -432,25 +457,22 @@ module TSCommonMark
 					r.appendChild( root );
 					root = r;
 				}
-				this.lastStack().appendChild( root );
-				this.stack.push( coderoot );
+				this.root.appendChild( root );
 			}
 
 			line = line.replace( /^\>{0,1}(\t|    | {1,3}\t)/, '' );
 			if ( softtab ) { line = line.replace( '\t', '  ' ); }
-			const coderoot = this.stack[ this.stack.length - 1 ];
+			const coderoot = <LiteNode>this.innermostNode( this.lastNode(), 'code' );
 			coderoot.appendChild( new LiteTextNode( line ) );
 		}
 
-		private addLine( now: CommonMarkTypes, line: string )
+		private addHorizon( now: CommonMarkTypes, line: string )
 		{
-			this.initStack();
 			const root = new LiteNode( 'hr' );
-			this.lastStack().appendChild( root );
-			this.stack.push( root );
+			this.root.appendChild( root );
 		}
 
-		private popStack()
+		/*private popStack()
 		{
 			if ( this.stack.length <= 1 ) { return; }
 			this.stack.pop();
@@ -464,7 +486,7 @@ module TSCommonMark
 		private lastStack()
 		{
 			return this.stack[ this.stack.length - 1 ];
-		}
+		}*/
 
 	}
 
