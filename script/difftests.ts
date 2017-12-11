@@ -4,6 +4,25 @@
 import fs = require( 'fs' );
 import path = require( 'path' );
 
+const MODE =
+{
+	NOT_FOUND: false,
+	DIFFERENT: true,
+};
+
+const COLOR =
+{
+	BLACK:   '\u001b[30m',
+	RED:     '\u001b[31m',
+	GREEN:   '\u001b[32m',
+	YELLOW:  '\u001b[33m',
+	BLUE:    '\u001b[34m',
+	MAGENTA: '\u001b[35m',
+	CYAN:    '\u001b[36m',
+	WHITE:   '\u001b[37m',
+	RESET:   '\u001b[0m',
+};
+
 function GetFiles( dir: string ): Promise<string[]>
 {
 	return new Promise( ( resolve, reject ) =>
@@ -49,13 +68,13 @@ function CheckDiff( olddir: string, newdir: string, file: string )
 	{
 		if ( data[ 0 ] !== data[ 1 ] )
 		{
-			console.log( 'Different:', file );
+			if ( MODE.DIFFERENT ) { console.log( COLOR.RED + 'Different:' + COLOR.RESET, file ); }
 			return Promise.resolve( false );
 		}
 		return Promise.resolve( true );
 	} ).catch( ( e ) =>
 	{
-		//console.log( 'Not found:', file );
+		if ( MODE.NOT_FOUND ) { console.log( COLOR.RED + 'Not found:' + COLOR.RESET, file ); }
 		return Promise.resolve( false );
 	} );
 }

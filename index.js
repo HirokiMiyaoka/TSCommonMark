@@ -1,16 +1,6 @@
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 var TSCommonMark;
 (function (TSCommonMark) {
-    var CommonMarkTypes;
+    let CommonMarkTypes;
     (function (CommonMarkTypes) {
         CommonMarkTypes[CommonMarkTypes["NONE"] = 0] = "NONE";
         CommonMarkTypes[CommonMarkTypes["HEADLINE"] = 1] = "HEADLINE";
@@ -24,9 +14,8 @@ var TSCommonMark;
         CommonMarkTypes[CommonMarkTypes["HORIZON"] = 9] = "HORIZON";
     })(CommonMarkTypes || (CommonMarkTypes = {}));
     ;
-    var LiteNodeBase = (function () {
-        function LiteNodeBase(tag, option) {
-            if (option === void 0) { option = {}; }
+    class LiteNodeBase {
+        constructor(tag, option = {}) {
             this.tag = tag;
             this.close = true;
             switch (tag) {
@@ -36,65 +25,52 @@ var TSCommonMark;
                     break;
             }
         }
-        LiteNodeBase.prototype.changeOption = function (option) {
-            if (option === void 0) { option = {}; }
-        };
-        LiteNodeBase.prototype.toString = function () {
+        changeOption(option = {}) { }
+        toString() {
             return this.close ? '<' + this.tag + ' />' : ['<', '></', '>'].join(this.tag);
-        };
-        LiteNodeBase.prototype.toDOM = function () { return document.createElement(this.tag); };
-        return LiteNodeBase;
-    }());
+        }
+        toDOM() { return document.createElement(this.tag); }
+    }
     TSCommonMark.LiteNodeBase = LiteNodeBase;
-    var LiteTextNode = (function (_super) {
-        __extends(LiteTextNode, _super);
-        function LiteTextNode(text, option) {
-            if (option === void 0) { option = {}; }
-            var _this = _super.call(this, 'text', option) || this;
-            _this.text = text;
-            return _this;
+    class LiteTextNode extends LiteNodeBase {
+        constructor(text, option = {}) {
+            super('text', option);
+            this.text = text;
         }
-        LiteTextNode.prototype.toString = function () { return this.text; };
-        LiteTextNode.prototype.toDOM = function () { return document.createTextNode(this.text); };
-        return LiteTextNode;
-    }(LiteNodeBase));
-    var LiteNode = (function (_super) {
-        __extends(LiteNode, _super);
-        function LiteNode(tag, option) {
-            if (tag === void 0) { tag = ''; }
-            if (option === void 0) { option = {}; }
-            var _this = _super.call(this, tag, option) || this;
-            _this.childlen = [];
-            _this.attribute = {};
-            _this.newLineBegin = false;
-            _this.newLine = true;
-            _this.changeOption(option);
-            return _this;
+        toString() { return this.text; }
+        toDOM() { return document.createTextNode(this.text); }
+    }
+    class LiteNode extends LiteNodeBase {
+        constructor(tag = '', option = {}) {
+            super(tag, option);
+            this.childlen = [];
+            this.attribute = {};
+            this.newLineBegin = false;
+            this.newLine = true;
+            this.changeOption(option);
         }
-        LiteNode.prototype.changeOption = function (option) {
-            if (option === void 0) { option = {}; }
+        changeOption(option = {}) {
             if (option.newLineBegin !== undefined) {
                 this.newLineBegin = !!option.newLineBegin;
             }
             if (option.oneLine !== undefined) {
                 this.newLine = !option.oneLine;
             }
-        };
-        LiteNode.prototype.getTag = function () { return this.tag; };
-        LiteNode.prototype.changeTag = function (tag) { this.tag = tag; };
-        LiteNode.prototype.appendChild = function (children) {
-            var _this = this;
+        }
+        getTag() { return this.tag; }
+        changeTag(tag) { this.tag = tag; }
+        appendChild(children) {
             if (Array.isArray(children)) {
-                children.forEach(function (child) { _this.childlen.push(child); });
+                children.forEach((child) => { this.childlen.push(child); });
             }
             else {
                 this.childlen.push(children);
             }
-        };
-        LiteNode.prototype.setAttribute = function (key, value) {
+        }
+        setAttribute(key, value) {
             this.attribute[key] = value;
-        };
-        LiteNode.prototype.toString = function () {
+        }
+        toString() {
             if (!this.tag) {
                 return this.toStringChildren();
             }
@@ -102,57 +78,52 @@ var TSCommonMark;
                 return '<' + this.tag + ' />' + (this.newLine ? '\n' : '');
             }
             return '<' + this.tag + this.toStringAttribute() + '>' + (this.newLineBegin ? '\n' : '') + this.toStringChildren() + '</' + this.tag + '>' + (this.newLine ? '\n' : '');
-        };
-        LiteNode.prototype.toStringAttribute = function () {
-            var _this = this;
-            var keys = Object.keys(this.attribute);
+        }
+        toStringAttribute() {
+            const keys = Object.keys(this.attribute);
             if (keys.length <= 0) {
                 return '';
             }
-            return ' ' + keys.map(function (key) {
-                return key + '="' + (_this.attribute[key] || '').replace(/\"/g, '&quot;') + '"';
+            return ' ' + keys.map((key) => {
+                return key + '="' + (this.attribute[key] || '').replace(/\"/g, '&quot;') + '"';
             }).join(' ');
-        };
-        LiteNode.prototype.toStringChildren = function () {
-            return this.childlen.map(function (child) { return child.toString(); }).join('');
-        };
-        LiteNode.prototype.toDOM = function (node) {
-            var _this = this;
-            var root = node || document.createElement(this.tag || 'div');
-            Object.keys(this.attribute).forEach(function (key) {
+        }
+        toStringChildren() {
+            return this.childlen.map((child) => { return child.toString(); }).join('');
+        }
+        toDOM(node) {
+            const root = node || document.createElement(this.tag || 'div');
+            Object.keys(this.attribute).forEach((key) => {
                 if (key === 'class') {
-                    (_a = root.classList).add.apply(_a, _this.attribute.class.split(' '));
+                    root.classList.add(...this.attribute.class.split(' '));
                 }
                 else {
-                    root[key] = _this.attribute[key];
+                    root[key] = this.attribute[key];
                 }
-                var _a;
             });
-            this.childlen.forEach(function (child) {
+            this.childlen.forEach((child) => {
                 root.appendChild(child.toDOM());
             });
             return root;
-        };
-        return LiteNode;
-    }(LiteNodeBase));
-    var CommonMark = (function () {
-        function CommonMark() {
+        }
+    }
+    class CommonMark {
+        constructor() {
             this.root = new LiteNode();
         }
-        CommonMark.prototype.toDOM = function (node) { return this.root.toDOM(node); };
-        CommonMark.prototype.toString = function () {
+        toDOM(node) { return this.root.toDOM(node); }
+        toString() {
             return this.root.toString();
-        };
-        CommonMark.prototype.parse = function (source) {
-            var lines = source.split('\n');
+        }
+        parse(source) {
+            const lines = source.split('\n');
             this.parseLines(lines);
             return this;
-        };
-        CommonMark.prototype.parseLines = function (lines) {
-            var _this = this;
-            var type = CommonMarkTypes.NONE;
-            lines.forEach(function (line, index) {
-                var ltype = _this.lineType(line, type);
+        }
+        parseLines(lines) {
+            let type = CommonMarkTypes.NONE;
+            lines.forEach((line, index) => {
+                const ltype = this.lineType(line, type);
                 if (ltype === CommonMarkTypes.NONE) {
                     if (type === CommonMarkTypes.PARAGRAPH) {
                         type = CommonMarkTypes.NONE;
@@ -162,19 +133,19 @@ var TSCommonMark;
                     type = CommonMarkTypes.NONE;
                 }
                 else if (ltype === CommonMarkTypes.HEADLINE1 || ltype === CommonMarkTypes.HEADLINE2) {
-                    _this.addHeadlineSP(type, line);
+                    this.addHeadlineSP(type, line);
                     type = CommonMarkTypes.NONE;
                     return;
                 }
                 else if (type === CommonMarkTypes.PARAGRAPH) {
-                    _this.addParagraph(type, line);
+                    this.addParagraph(type, line);
                     type = ltype;
                     return;
                 }
-                type = _this.addLine(ltype, type, line);
+                type = this.addLine(ltype, type, line);
             });
-        };
-        CommonMark.prototype.addLine = function (ltype, type, line) {
+        }
+        addLine(ltype, type, line) {
             switch (ltype) {
                 case CommonMarkTypes.HEADLINE:
                     this.addHeadline(type, line);
@@ -197,8 +168,8 @@ var TSCommonMark;
                     return CommonMarkTypes.NONE;
             }
             return type;
-        };
-        CommonMark.prototype.lineType = function (line, type) {
+        }
+        lineType(line, type) {
             if (this.inList() && line.match(/^\t/)) {
                 return CommonMarkTypes.UITEM;
             }
@@ -226,24 +197,23 @@ var TSCommonMark;
                 return CommonMarkTypes.NONE;
             }
             return CommonMarkTypes.PARAGRAPH;
-        };
-        CommonMark.prototype.lastNode = function (node) {
-            if (node === void 0) { node = this.root; }
+        }
+        lastNode(node = this.root) {
             return node.childlen[this.root.childlen.length - 1];
-        };
-        CommonMark.prototype.innermostNode = function (node, tag) {
-            var result = this._innermostNode(node, tag);
+        }
+        innermostNode(node, tag) {
+            const result = this._innermostNode(node, tag);
             if (result === null) {
                 return node;
             }
             return result;
-        };
-        CommonMark.prototype._innermostNode = function (node, tag) {
+        }
+        _innermostNode(node, tag) {
             if (!node || node.childlen === undefined) {
                 return null;
             }
             if (node.getTag() === tag) {
-                var last = this._innermostNode(this.lastNode(node), tag) || node;
+                const last = this._innermostNode(this.lastNode(node), tag) || node;
                 return node;
             }
             else {
@@ -252,28 +222,28 @@ var TSCommonMark;
                 }
             }
             return this._innermostNode(this.lastNode(node), tag);
-        };
-        CommonMark.prototype.inList = function () {
-            var last = this.lastNode();
+        }
+        inList() {
+            const last = this.lastNode();
             if (!last || last.getTag === undefined) {
                 return false;
             }
             return last.getTag() === 'ul';
-        };
-        CommonMark.prototype.parseInline = function (line) {
-            var nodes = [];
-            var data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
+        }
+        parseInline(line) {
+            const nodes = [];
+            let data = this.margeInlineNodes(nodes, this.parseEmphasis(line), false);
             data = this.margeInlineNodes(nodes, this.parseAnchor(data.next || ''), false);
             if (data.next) {
                 nodes.push(new LiteTextNode(data.next));
             }
             return nodes;
-        };
-        CommonMark.prototype.margeInlineNodes = function (nodes, data, recrusion) {
+        }
+        margeInlineNodes(nodes, data, recrusion) {
             if (data.prev) {
                 if (recrusion) {
-                    var pdata = this.parseInline(data.prev);
-                    nodes.push.apply(nodes, pdata);
+                    const pdata = this.parseInline(data.prev);
+                    nodes.push(...pdata);
                 }
                 else {
                     nodes.push(new LiteTextNode(data.prev));
@@ -285,14 +255,14 @@ var TSCommonMark;
                 delete data.node;
             }
             return data;
-        };
-        CommonMark.prototype.parseEmphasis = function (line) {
-            var r = /\*([^\*]+?)\*/g;
-            var match = r.exec(line);
+        }
+        parseEmphasis(line) {
+            const r = /\*([^\*]+?)\*/g;
+            const match = r.exec(line);
             if (!match) {
                 return { next: line };
             }
-            var data = {};
+            const data = {};
             if (match.index) {
                 data.prev = line.substr(0, match.index);
             }
@@ -302,14 +272,14 @@ var TSCommonMark;
             data.node = new LiteNode('em', { oneLine: true });
             data.node.appendChild(new LiteTextNode(match[1] || ''));
             return data;
-        };
-        CommonMark.prototype.parseAnchor = function (line) {
-            var r = /\[(.+?)\]\((.*?)\)/g;
-            var match = r.exec(line);
+        }
+        parseAnchor(line) {
+            const r = /\[(.+?)\]\((.*?)\)/g;
+            const match = r.exec(line);
             if (!match) {
                 return { next: line };
             }
-            var data = {};
+            const data = {};
             if (match.index) {
                 data.prev = line.substr(0, match.index);
             }
@@ -320,67 +290,67 @@ var TSCommonMark;
             data.node.setAttribute('href', match[2] || '');
             data.node.appendChild(new LiteTextNode(match[1] || ''));
             return data;
-        };
-        CommonMark.prototype.addHeadline = function (now, line) {
-            var _a = line.split(/\s+/, 2), lv = _a[0], title = _a[1];
-            var root = new LiteNode('h' + lv.length);
+        }
+        addHeadline(now, line) {
+            const [lv, title] = line.split(/\s+/, 2);
+            const root = new LiteNode('h' + lv.length);
             root.appendChild(new LiteTextNode(title));
             this.root.appendChild(root);
-        };
-        CommonMark.prototype.addHeadlineSP = function (now, line) {
-            var last = this.lastNode();
+        }
+        addHeadlineSP(now, line) {
+            const last = this.lastNode();
             last.changeTag(now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2');
-        };
-        CommonMark.prototype.addUList = function (now, line) {
+        }
+        addUList(now, line) {
             if (now === CommonMarkTypes.ULIST) {
                 return;
             }
-            var root = new LiteNode('ul', { newLineBegin: true });
+            const root = new LiteNode('ul', { newLineBegin: true });
             this.root.appendChild(root);
-        };
-        CommonMark.prototype.addUListItem = function (now, line) {
-            var item = new LiteNode('li');
+        }
+        addUListItem(now, line) {
+            const item = new LiteNode('li');
             item.appendChild(new LiteTextNode(line.split(/[\-\*] /, 2)[1]));
             this.innermostNode(this.lastNode(), 'ul').appendChild(item);
-        };
-        CommonMark.prototype.appendUListItem = function (now, line) {
-            var lastli = this.innermostNode(this.lastNode(), 'li');
+        }
+        appendUListItem(now, line) {
+            const lastli = this.innermostNode(this.lastNode(), 'li');
             if (lastli.childlen[lastli.childlen.length - 1].getTag === undefined) {
-                var textnode = lastli.childlen[lastli.childlen.length - 1];
-                var p_1 = new LiteNode('p', { oneLine: false });
-                p_1.appendChild(textnode);
-                lastli.childlen[lastli.childlen.length - 1] = p_1;
+                const textnode = lastli.childlen[lastli.childlen.length - 1];
+                const p = new LiteNode('p', { oneLine: false });
+                p.appendChild(textnode);
+                lastli.childlen[lastli.childlen.length - 1] = p;
                 lastli.changeOption({ newLineBegin: true, oneLine: false });
             }
             line = line.replace(/^\t/, '');
-            var p = new LiteNode('p', { oneLine: false });
+            const p = new LiteNode('p', { oneLine: false });
             p.appendChild(new LiteTextNode(line));
             lastli.appendChild(p);
-        };
-        CommonMark.prototype.addParagraph = function (now, line) {
+        }
+        addParagraph(now, line) {
             line = line.replace(/^\s+/, '');
             if (!line) {
                 return;
             }
             if (now !== CommonMarkTypes.PARAGRAPH) {
-                var root = new LiteNode('p');
+                const root = new LiteNode('p');
                 this.root.appendChild(root);
             }
             else {
                 line = '\n' + line;
             }
-            var proot = this.lastNode();
+            const proot = this.lastNode();
             proot.appendChild(this.parseInline(line));
-        };
-        CommonMark.prototype.addCodeBlock = function (now, line) {
-            var softtab = !!line.match(/^\>/);
+        }
+        addCodeBlock(now, line) {
+            let softtab = !!line.match(/^\>/);
             line += '\n';
             if (now !== CommonMarkTypes.CODE) {
-                var root = new LiteNode('pre');
-                var coderoot_1 = new LiteNode('code', { oneLine: true });
-                root.appendChild(coderoot_1);
+                let root = new LiteNode('pre');
+                const coderoot = new LiteNode('code', { oneLine: true });
+                root.appendChild(coderoot);
                 if (line.match(/^\>/)) {
-                    var r = new LiteNode('blockquote', { newLineBegin: true });
+                    const r = new LiteNode('blockquote', { newLineBegin: true });
                     r.appendChild(root);
                     root = r;
                 }
@@ -390,23 +360,22 @@ var TSCommonMark;
             if (softtab) {
                 line = line.replace('\t', '  ');
             }
-            var coderoot = this.innermostNode(this.lastNode(), 'code');
+            const coderoot = this.innermostNode(this.lastNode(), 'code');
             coderoot.appendChild(new LiteTextNode(line));
-        };
-        CommonMark.prototype.addHorizon = function (now, line) {
-            var root = new LiteNode('hr');
+        }
+        addHorizon(now, line) {
+            const root = new LiteNode('hr');
             this.root.appendChild(root);
-        };
-        return CommonMark;
-    }());
+        }
+    }
     TSCommonMark.CommonMark = CommonMark;
     function parse2String(source) {
         return new CommonMark().parse(source).toString();
     }
     TSCommonMark.parse2String = parse2String;
     function parseLine2String(line) {
-        var list = new CommonMark().parseInline(line);
-        return list.map(function (child) { return child.toString(); }).join('');
+        const list = new CommonMark().parseInline(line);
+        return list.map((child) => { return child.toString(); }).join('');
     }
     TSCommonMark.parseLine2String = parseLine2String;
     function parse2DOMTree(source, node) {
@@ -414,15 +383,12 @@ var TSCommonMark;
     }
     TSCommonMark.parse2DOMTree = parse2DOMTree;
     function parseLine2DOMTree(line, node) {
-        var root = node || document.createElement('p');
-        new CommonMark().parseInline(line).forEach(function (child) {
+        const root = node || document.createElement('p');
+        new CommonMark().parseInline(line).forEach((child) => {
             root.appendChild(child.toDOM());
         });
         return root;
     }
     TSCommonMark.parseLine2DOMTree = parseLine2DOMTree;
 })(TSCommonMark || (TSCommonMark = {}));
-var cmarked = {
-    toString: function (md) { return TSCommonMark.parse2String(md); },
-    toDOM: function (md) { return TSCommonMark.parse2DOMTree(md); },
-};
+module.exports = TSCommonMark;

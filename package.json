@@ -3,8 +3,11 @@
   "version": "0.28.0",
   "description": "",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run bbuild & npm run nbuild",
+    "bbuild": "tsc --project browser",
+    "nbuild": "tsc --project nodejs",
     "script": "tsc --project script",
     "test": "node test.js"
   },

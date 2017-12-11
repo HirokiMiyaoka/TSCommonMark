@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"outFile": "../cmarked.js",
+		"module": "system",
+		"moduleResolution": "node",
+		"target": "es5",
+		"lib": [
+			"dom",
+			"es2017"
+		],
+		"strictNullChecks": true,
+		"noImplicitAny": true,
+		"removeComments": true,
+		"preserveConstEnums": false,
+		"sourceMap": false
+	},
+	"include": [
+		"../cmarked.ts",
+		"./*.ts"
+	]
+}

@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
-		"module": "commonjs",
-		"moduleResolution": "node",
+		"outFile": "../index.js",
+		"module": "amd",
 		"target": "es6",
 		"declaration": true,
 		"strictNullChecks": true,
@@ -11,6 +11,7 @@
 		"sourceMap": false
 	},
 	"include": [
-		"./cmarked.ts"
+		"../cmarked.ts",
+		"./*.ts"
 	]
 }

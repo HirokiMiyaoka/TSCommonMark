@@ -1,6 +1,6 @@
 const path = require( 'path' );
 const fs = require( 'fs' );
-const cmarked = require( './cmarked' );
+const cmarked = require( './index' );
 
 const MODE =
 {

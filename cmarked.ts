@@ -471,23 +471,6 @@ module TSCommonMark
 			const root = new LiteNode( 'hr' );
 			this.root.appendChild( root );
 		}
-
-		/*private popStack()
-		{
-			if ( this.stack.length <= 1 ) { return; }
-			this.stack.pop();
-		}
-
-		private initStack()
-		{
-			this.stack = [ this.root ];
-		}
-
-		private lastStack()
-		{
-			return this.stack[ this.stack.length - 1 ];
-		}*/
-
 	}
 
 	export function parse2String( source: string ): string
@@ -517,5 +500,3 @@ module TSCommonMark
 	}
 
 }
-
-export = TSCommonMark;
