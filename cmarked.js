@@ -16,31 +16,39 @@ var TSCommonMark;
         CommonMarkTypes[CommonMarkTypes["HEADLINE"] = 1] = "HEADLINE";
         CommonMarkTypes[CommonMarkTypes["HEADLINE1"] = 2] = "HEADLINE1";
         CommonMarkTypes[CommonMarkTypes["HEADLINE2"] = 3] = "HEADLINE2";
-        CommonMarkTypes[CommonMarkTypes["PARAGRAPH"] = 4] = "PARAGRAPH";
-        CommonMarkTypes[CommonMarkTypes["ANCHOR"] = 5] = "ANCHOR";
-        CommonMarkTypes[CommonMarkTypes["CODE"] = 6] = "CODE";
-        CommonMarkTypes[CommonMarkTypes["ULIST"] = 7] = "ULIST";
-        CommonMarkTypes[CommonMarkTypes["UITEM"] = 8] = "UITEM";
-        CommonMarkTypes[CommonMarkTypes["HORIZON"] = 9] = "HORIZON";
+        CommonMarkTypes[CommonMarkTypes["HEADLINE3"] = 4] = "HEADLINE3";
+        CommonMarkTypes[CommonMarkTypes["HEADLINE4"] = 5] = "HEADLINE4";
+        CommonMarkTypes[CommonMarkTypes["HEADLINE5"] = 6] = "HEADLINE5";
+        CommonMarkTypes[CommonMarkTypes["HEADLINE6"] = 7] = "HEADLINE6";
+        CommonMarkTypes[CommonMarkTypes["PARAGRAPH"] = 8] = "PARAGRAPH";
+        CommonMarkTypes[CommonMarkTypes["ANCHOR"] = 9] = "ANCHOR";
+        CommonMarkTypes[CommonMarkTypes["CODE"] = 10] = "CODE";
+        CommonMarkTypes[CommonMarkTypes["ULIST"] = 11] = "ULIST";
+        CommonMarkTypes[CommonMarkTypes["UITEM"] = 12] = "UITEM";
+        CommonMarkTypes[CommonMarkTypes["HORIZON"] = 13] = "HORIZON";
     })(CommonMarkTypes || (CommonMarkTypes = {}));
     ;
+    var TagTable = (_a = {},
+        _a[CommonMarkTypes.HEADLINE1] = 'h1',
+        _a[CommonMarkTypes.HEADLINE2] = 'h2',
+        _a[CommonMarkTypes.HEADLINE3] = 'h3',
+        _a[CommonMarkTypes.HEADLINE4] = 'h4',
+        _a[CommonMarkTypes.HEADLINE5] = 'h5',
+        _a[CommonMarkTypes.HEADLINE6] = 'h6',
+        _a[CommonMarkTypes.PARAGRAPH] = 'p',
+        _a[CommonMarkTypes.ULIST] = 'ul',
+        _a[CommonMarkTypes.HORIZON] = 'hr',
+        _a);
     var LiteNodeBase = (function () {
         function LiteNodeBase(tag, option) {
             if (option === void 0) { option = {}; }
             this.tag = tag;
-            this.close = true;
-            switch (tag) {
-                case 'br':
-                case 'hr':
-                    this.close = false;
-                    break;
-            }
         }
         LiteNodeBase.prototype.changeOption = function (option) {
             if (option === void 0) { option = {}; }
         };
         LiteNodeBase.prototype.toString = function () {
-            return this.close ? '<' + this.tag + ' />' : ['<', '></', '>'].join(this.tag);
+            return ['<', '></', '>'].join(this.tag);
         };
         LiteNodeBase.prototype.toDOM = function () { return document.createElement(this.tag); };
         return LiteNodeBase;
@@ -64,6 +72,7 @@ var TSCommonMark;
             if (tag === void 0) { tag = ''; }
             if (option === void 0) { option = {}; }
             var _this = _super.call(this, tag, option) || this;
+            _this.changeTag(tag);
             _this.childlen = [];
             _this.attribute = {};
             _this.newLineBegin = false;
@@ -81,7 +90,16 @@ var TSCommonMark;
             }
         };
         LiteNode.prototype.getTag = function () { return this.tag; };
-        LiteNode.prototype.changeTag = function (tag) { this.tag = tag; };
+        LiteNode.prototype.changeTag = function (tag) {
+            this.tag = tag;
+            this.close = true;
+            switch (tag) {
+                case 'br':
+                case 'hr':
+                    this.close = false;
+                    break;
+            }
+        };
         LiteNode.prototype.appendChild = function (children) {
             var _this = this;
             if (Array.isArray(children)) {
@@ -145,87 +163,33 @@ var TSCommonMark;
         };
         CommonMark.prototype.parse = function (source) {
             var lines = source.split('\n');
-            this.parseLines(lines);
+            while (0 < lines.length) {
+                var isLastList = this.checkLastNode('ul');
+                var block = new CommonMarkBlock().parse(lines, isLastList);
+                if (!block) {
+                    continue;
+                }
+                if (isLastList && (block.getTag() === 'pre' || block.getTag() === 'p')) {
+                    var li = this.lastNode(this.lastNode());
+                    if (li.childlen.length === 1 && !li.childlen[0].getTag) {
+                        li.changeOption({ newLineBegin: true });
+                        var p = new LiteNode('p');
+                        p.appendChild(li.childlen[0]);
+                        li.childlen[0] = p;
+                    }
+                    li.appendChild(block);
+                    continue;
+                }
+                this.root.appendChild(block);
+            }
             return this;
         };
-        CommonMark.prototype.parseLines = function (lines) {
-            var _this = this;
-            var type = CommonMarkTypes.NONE;
-            lines.forEach(function (line, index) {
-                var ltype = _this.lineType(line, type);
-                if (ltype === CommonMarkTypes.NONE) {
-                    if (type === CommonMarkTypes.PARAGRAPH) {
-                        type = CommonMarkTypes.NONE;
-                    }
-                }
-                else if (ltype === CommonMarkTypes.HORIZON) {
-                    type = CommonMarkTypes.NONE;
-                }
-                else if (ltype === CommonMarkTypes.HEADLINE1 || ltype === CommonMarkTypes.HEADLINE2) {
-                    _this.addHeadlineSP(type, line);
-                    type = CommonMarkTypes.NONE;
-                    return;
-                }
-                else if (type === CommonMarkTypes.PARAGRAPH) {
-                    _this.addParagraph(type, line);
-                    type = ltype;
-                    return;
-                }
-                type = _this.addLine(ltype, type, line);
-            });
-        };
-        CommonMark.prototype.addLine = function (ltype, type, line) {
-            switch (ltype) {
-                case CommonMarkTypes.HEADLINE:
-                    this.addHeadline(type, line);
-                    return CommonMarkTypes.NONE;
-                case CommonMarkTypes.ULIST:
-                    this.addUList(type, line);
-                    this.addUListItem(type, line);
-                    return ltype;
-                case CommonMarkTypes.UITEM:
-                    this.appendUListItem(type, line);
-                    break;
-                case CommonMarkTypes.CODE:
-                    this.addCodeBlock(type, line);
-                    return ltype;
-                case CommonMarkTypes.PARAGRAPH:
-                    this.addParagraph(type, line);
-                    return ltype;
-                case CommonMarkTypes.HORIZON:
-                    this.addHorizon(type, line);
-                    return CommonMarkTypes.NONE;
+        CommonMark.prototype.checkLastNode = function (tag) {
+            var last = this.lastNode();
+            if (!last) {
+                return false;
             }
-            return type;
-        };
-        CommonMark.prototype.lineType = function (line, type) {
-            if (this.inList() && line.match(/^\t/)) {
-                return CommonMarkTypes.UITEM;
-            }
-            if (line.match(/^\#{1,6}\s+/)) {
-                return CommonMarkTypes.HEADLINE;
-            }
-            if (type === CommonMarkTypes.PARAGRAPH) {
-                if (line.match(/^\={2,}$/)) {
-                    return CommonMarkTypes.HEADLINE1;
-                }
-                if (line.match(/^\-{2,}$/)) {
-                    return CommonMarkTypes.HEADLINE2;
-                }
-            }
-            if (line.match(/^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/)) {
-                return CommonMarkTypes.HORIZON;
-            }
-            if (line.match(/^ {0,3}[\-\*] /)) {
-                return CommonMarkTypes.ULIST;
-            }
-            if (line.match(/^\>{0,1}(\t|    | {1,3}\t)/)) {
-                return CommonMarkTypes.CODE;
-            }
-            if (!line) {
-                return CommonMarkTypes.NONE;
-            }
-            return CommonMarkTypes.PARAGRAPH;
+            return last.getTag() === tag;
         };
         CommonMark.prototype.lastNode = function (node) {
             if (node === void 0) { node = this.root; }
@@ -253,92 +217,167 @@ var TSCommonMark;
             }
             return this._innermostNode(this.lastNode(node), tag);
         };
-        CommonMark.prototype.inList = function () {
-            var last = this.lastNode();
-            if (!last || last.getTag === undefined) {
-                return false;
-            }
-            return last.getTag() === 'ul';
-        };
-        CommonMark.prototype.addHeadline = function (now, line) {
-            var _a = line.split(/\s+/, 2), lv = _a[0], title = _a[1];
-            var root = new LiteNode('h' + lv.length);
-            root.appendChild(new LiteTextNode(title));
-            this.root.appendChild(root);
-        };
-        CommonMark.prototype.addHeadlineSP = function (now, line) {
-            var last = this.lastNode();
-            last.changeTag(now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2');
-        };
-        CommonMark.prototype.addUList = function (now, line) {
-            if (now === CommonMarkTypes.ULIST) {
-                return;
-            }
-            var root = new LiteNode('ul', { newLineBegin: true });
-            this.root.appendChild(root);
-        };
-        CommonMark.prototype.addUListItem = function (now, line) {
-            var item = new LiteNode('li');
-            item.appendChild(new LiteTextNode(line.split(/[\-\*] /, 2)[1]));
-            this.innermostNode(this.lastNode(), 'ul').appendChild(item);
-        };
-        CommonMark.prototype.appendUListItem = function (now, line) {
-            var lastli = this.innermostNode(this.lastNode(), 'li');
-            if (lastli.childlen[lastli.childlen.length - 1].getTag === undefined) {
-                var textnode = lastli.childlen[lastli.childlen.length - 1];
-                var p_1 = new LiteNode('p', { oneLine: false });
-                p_1.appendChild(textnode);
-                lastli.childlen[lastli.childlen.length - 1] = p_1;
-                lastli.changeOption({ newLineBegin: true, oneLine: false });
-            }
-            line = line.replace(/^\t/, '');
-            var p = new LiteNode('p', { oneLine: false });
-            p.appendChild(new LiteTextNode(line));
-            lastli.appendChild(p);
-        };
-        CommonMark.prototype.addParagraph = function (now, line) {
-            line = line.replace(/^\s+/, '');
-            if (!line) {
-                return;
-            }
-            if (now !== CommonMarkTypes.PARAGRAPH) {
-                var root = new LiteNode('p');
-                this.root.appendChild(root);
-            }
-            else {
-                line = '\n' + line;
-            }
-            var proot = this.lastNode();
-            proot.appendChild(new CommonMarkInline().parseInline(line));
-        };
-        CommonMark.prototype.addCodeBlock = function (now, line) {
-            var softtab = !!line.match(/^\>/);
-            line += '\n';
-            if (now !== CommonMarkTypes.CODE) {
-                var root = new LiteNode('pre');
-                var coderoot_1 = new LiteNode('code', { oneLine: true });
-                root.appendChild(coderoot_1);
-                if (line.match(/^\>/)) {
-                    var r = new LiteNode('blockquote', { newLineBegin: true });
-                    r.appendChild(root);
-                    root = r;
-                }
-                this.root.appendChild(root);
-            }
-            line = line.replace(/^\>{0,1}(\t|    | {1,3}\t)/, '');
-            if (softtab) {
-                line = line.replace('\t', '  ');
-            }
-            var coderoot = this.innermostNode(this.lastNode(), 'code');
-            coderoot.appendChild(new LiteTextNode(line));
-        };
-        CommonMark.prototype.addHorizon = function (now, line) {
-            var root = new LiteNode('hr');
-            this.root.appendChild(root);
-        };
         return CommonMark;
     }());
     TSCommonMark.CommonMark = CommonMark;
+    var CommonMarkBlock = (function () {
+        function CommonMarkBlock() {
+            this.root = new LiteNode();
+        }
+        CommonMarkBlock.prototype.parse = function (lines, beforeList) {
+            if (lines.length <= 0) {
+                return null;
+            }
+            var line = lines.shift();
+            var result = this.lineParser(line, beforeList);
+            if (result.type === CommonMarkTypes.NONE) {
+                return null;
+            }
+            var root = this.changeRoot(result.type);
+            switch (result.type) {
+                case CommonMarkTypes.HORIZON:
+                    return this.root;
+            }
+            if (result.line && result.type !== CommonMarkTypes.CODE) {
+                this.root.appendChild(this.parseInline(result.line.replace(/^[ \t]+/, '')));
+            }
+            switch (result.type) {
+                case CommonMarkTypes.HEADLINE1:
+                case CommonMarkTypes.HEADLINE2:
+                case CommonMarkTypes.HEADLINE3:
+                case CommonMarkTypes.HEADLINE4:
+                case CommonMarkTypes.HEADLINE5:
+                case CommonMarkTypes.HEADLINE6:
+                    return this.root;
+            }
+            switch (result.type) {
+                case CommonMarkTypes.PARAGRAPH:
+                    if (this.specialHeadline(lines)) {
+                        return this.root;
+                    }
+                    if (result.option) {
+                        return this.root;
+                    }
+                    this.loopParagraph(lines);
+                    break;
+                case CommonMarkTypes.CODE:
+                    if (result.option) {
+                        this.root.changeTag('blockquote');
+                        this.root.changeOption({ newLineBegin: true });
+                        var pre = new LiteNode('pre');
+                        pre.appendChild(this.loopCodeBlock(lines, result.line));
+                        this.root.appendChild(pre);
+                    }
+                    else {
+                        this.root.changeTag('pre');
+                        this.root.appendChild(this.loopCodeBlock(lines, result.line));
+                    }
+                    break;
+                case CommonMarkTypes.ULIST:
+                    this.root.changeOption({ newLineBegin: true });
+                    this.root.appendChild(this.createListItem(result.option));
+                    this.loopList(lines);
+                    break;
+            }
+            return this.root;
+        };
+        CommonMarkBlock.prototype.lineParser = function (line, beforeList) {
+            if (!line) {
+                return { type: CommonMarkTypes.NONE };
+            }
+            var result;
+            if ((result = line.match(/^(\#{1,6})\s+(.*)$/))) {
+                return { type: CommonMarkTypes.HEADLINE + result[1].length, line: result[2] };
+            }
+            if (line.match(/^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/)) {
+                return { type: CommonMarkTypes.HORIZON };
+            }
+            if ((result = line.match(/^ {0,3}[\-\*] (.*)/))) {
+                return { type: CommonMarkTypes.ULIST, option: result[1] };
+            }
+            if (beforeList && (result = line.match(/^\t([^\s]+)/))) {
+                return { type: CommonMarkTypes.PARAGRAPH, line: result[1], option: true };
+            }
+            if ((result = line.match(/^(\>{0,1})(\t|    | {1,3}\t)(.+)/))) {
+                return { type: CommonMarkTypes.CODE, line: result[3].replace(/^\t/, '  '), option: !!result[1] };
+            }
+            return { type: CommonMarkTypes.PARAGRAPH, line: line };
+        };
+        CommonMarkBlock.prototype.specialHeadline = function (lines) {
+            if (lines.length <= 0) {
+                return false;
+            }
+            var line = lines.shift();
+            if (line.match(/^\={2,}$/)) {
+                this.changeRoot(CommonMarkTypes.HEADLINE1);
+                return true;
+            }
+            if (line.match(/^\-{2,}$/)) {
+                this.changeRoot(CommonMarkTypes.HEADLINE2);
+                return true;
+            }
+            lines.unshift(line);
+            return false;
+        };
+        CommonMarkBlock.prototype.changeRoot = function (type) {
+            if (TagTable[type]) {
+                this.root.changeTag(TagTable[type]);
+                return this.root;
+            }
+            return this.root;
+        };
+        CommonMarkBlock.prototype.parseInline = function (line) {
+            return new CommonMarkInline().parseInline(line);
+        };
+        CommonMarkBlock.prototype.loopParagraph = function (lines) {
+            while (0 < lines.length) {
+                var line = lines.shift();
+                var result = this.lineParser(line);
+                switch (result.type) {
+                    case CommonMarkTypes.NONE:
+                        return;
+                    case CommonMarkTypes.HORIZON:
+                        lines.unshift(line);
+                        return;
+                }
+                this.root.appendChild(this.parseInline('\n' + line.replace(/^[ \t]+/, '')));
+            }
+        };
+        CommonMarkBlock.prototype.loopCodeBlock = function (lines, first) {
+            var code = new LiteNode('code', { oneLine: true });
+            code.appendChild(new LiteTextNode(first + '\n'));
+            while (0 < lines.length) {
+                var line = lines.shift();
+                var result = this.lineParser(line);
+                switch (result.type) {
+                    case CommonMarkTypes.NONE:
+                        return code;
+                }
+                code.appendChild(new LiteTextNode(result.line + '\n'));
+            }
+            return code;
+        };
+        CommonMarkBlock.prototype.loopList = function (lines) {
+            while (0 < lines.length) {
+                var line = lines.shift();
+                var result = this.lineParser(line);
+                switch (result.type) {
+                    case CommonMarkTypes.NONE:
+                        return;
+                    case CommonMarkTypes.HORIZON:
+                        lines.unshift(line);
+                        return;
+                }
+                this.root.appendChild(this.createListItem(typeof result.option === 'string' ? result.option : ''));
+            }
+        };
+        CommonMarkBlock.prototype.createListItem = function (line) {
+            var li = new LiteNode('li');
+            li.appendChild(new CommonMarkInline().parseInline(line));
+            return li;
+        };
+        return CommonMarkBlock;
+    }());
     var CommonMarkInline = (function () {
         function CommonMarkInline() {
         }
@@ -440,6 +479,7 @@ var TSCommonMark;
         return new CommonMarkInline().parse(line).toDOM(node);
     }
     TSCommonMark.parseLine2DOMTree = parseLine2DOMTree;
+    var _a;
 })(TSCommonMark || (TSCommonMark = {}));
 var cmarked = {
     toString: function (md) { return TSCommonMark.parse2String(md); },

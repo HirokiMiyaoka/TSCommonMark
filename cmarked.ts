@@ -10,12 +10,29 @@ module TSCommonMark
 		HEADLINE,
 		HEADLINE1,
 		HEADLINE2,
+		HEADLINE3,
+		HEADLINE4,
+		HEADLINE5,
+		HEADLINE6,
 		PARAGRAPH,
 		ANCHOR,
 		CODE,
 		ULIST,
 		UITEM,
 		HORIZON,
+	};
+
+	const TagTable: { [ keys: number ]: string } =
+	{
+		[ CommonMarkTypes.HEADLINE1 ]: 'h1',
+		[ CommonMarkTypes.HEADLINE2 ]: 'h2',
+		[ CommonMarkTypes.HEADLINE3 ]: 'h3',
+		[ CommonMarkTypes.HEADLINE4 ]: 'h4',
+		[ CommonMarkTypes.HEADLINE5 ]: 'h5',
+		[ CommonMarkTypes.HEADLINE6 ]: 'h6',
+		[ CommonMarkTypes.PARAGRAPH ]: 'p',
+		[ CommonMarkTypes.ULIST     ]: 'ul',
+		[ CommonMarkTypes.HORIZON   ]: 'hr',
 	};
 
 	interface InlineParseData
@@ -34,26 +51,17 @@ module TSCommonMark
 	export class LiteNodeBase
 	{
 		protected tag: string;
-		protected close: boolean;
 
 		constructor( tag: string, option: TagOption = {} )
 		{
 			this.tag = tag;
-			this.close = true;
-			switch ( tag )
-			{
-			case 'br':
-			case 'hr':
-				this.close = false;
-				break;
-			}
 		}
 
 		public changeOption( option: TagOption = {} ) {}
 
 		public toString(): string
 		{
-			return this.close ? '<' + this.tag + ' />' : [ '<', '></', '>' ].join( this.tag );
+			return [ '<', '></', '>' ].join( this.tag );
 		}
 
 		public toDOM(): HTMLElement | Text { return document.createElement( this.tag ); }
@@ -77,12 +85,14 @@ module TSCommonMark
 	{
 		public childlen: LiteNodeBase[];
 		private attribute: { [ key: string ]: string };
+		private close: boolean;
 		private newLineBegin: boolean;
 		private newLine: boolean;
 
 		constructor( tag: string = '', option: TagOption = {} )
 		{
 			super( tag, option );
+			this.changeTag( tag );
 			this.childlen = [];
 			this.attribute = {};
 			this.newLineBegin = false;
@@ -98,7 +108,18 @@ module TSCommonMark
 
 		public getTag() { return this.tag; }
 
-		public changeTag( tag: string ) { this.tag = tag; }
+		public changeTag( tag: string )
+		{
+			this.tag = tag;
+			this.close = true;
+			switch ( tag )
+			{
+			case 'br':
+			case 'hr':
+				this.close = false;
+				break;
+			}
+		}
 
 		public appendChild( children: LiteNodeBase | LiteNodeBase[] )
 		{
@@ -180,95 +201,38 @@ module TSCommonMark
 		{
 			const lines = source.split( '\n' );
 
-			this.parseLines( lines );
+			//this.parseLines( lines );
+
+			while ( 0 < lines.length )
+			{
+				const isLastList = this.checkLastNode( 'ul' );
+				const block = new CommonMarkBlock().parse( lines, isLastList );
+				if ( !block ) { continue; }
+				if ( isLastList && ( block.getTag() === 'pre' || block.getTag() === 'p' ) )
+				{
+					const li = <LiteNode>this.lastNode( <LiteNode>this.lastNode() );
+					if ( li.childlen.length === 1 && !(<LiteNode>li.childlen[ 0 ]).getTag )
+					{
+						li.changeOption( { newLineBegin: true } );
+						const p = new LiteNode( 'p' );
+						p.appendChild( li.childlen[ 0 ] );
+						li.childlen[ 0 ] = p;
+					}
+					li.appendChild( block );
+					continue;
+				}
+
+				this.root.appendChild( block );
+			}
 
 			return this;
 		}
 
-		private parseLines( lines: string[] )
+		private checkLastNode( tag: string )
 		{
-			let type: CommonMarkTypes = CommonMarkTypes.NONE;
-
-			lines.forEach( ( line, index ) =>
-			{
-				const ltype = this.lineType( line, type );
-
-				if ( ltype === CommonMarkTypes.NONE )
-				{
-					if ( type === CommonMarkTypes.PARAGRAPH ) { type = CommonMarkTypes.NONE; }
-				} else if( ltype === CommonMarkTypes.HORIZON )
-				{
-					type = CommonMarkTypes.NONE;
-				} else if( ltype === CommonMarkTypes.HEADLINE1 || ltype === CommonMarkTypes.HEADLINE2 )
-				{
-					this.addHeadlineSP( type, line );
-					type = CommonMarkTypes.NONE;
-					return;
-				} else if ( type === CommonMarkTypes.PARAGRAPH )
-				{
-					this.addParagraph( type, line );
-					type = ltype;
-					return;
-				}
-
-				type = this.addLine( ltype, type, line );
-			} );
-		}
-
-		private addLine( ltype: CommonMarkTypes, type: CommonMarkTypes, line: string )
-		{
-			switch ( ltype )
-			{
-				case CommonMarkTypes.HEADLINE:
-					this.addHeadline( type, line );
-					return CommonMarkTypes.NONE;
-				case CommonMarkTypes.ULIST:
-					this.addUList( type, line );
-					this.addUListItem( type, line );
-					return ltype;
-				case CommonMarkTypes.UITEM:
-					this.appendUListItem( type, line );
-					break;
-				case CommonMarkTypes.CODE:
-					this.addCodeBlock( type, line );
-					return ltype;
-				case CommonMarkTypes.PARAGRAPH:
-					this.addParagraph( type, line );
-					return ltype;
-				case CommonMarkTypes.HORIZON:
-					this.addHorizon( type, line );
-					return CommonMarkTypes.NONE;
-			}
-			return type;
-		}
-
-		private lineType( line: string, type: number ): CommonMarkTypes
-		{
-			if ( this.inList() && line.match( /^\t/ ) ) { return CommonMarkTypes.UITEM; }
-
-			// Headline
-			if ( line.match( /^\#{1,6}\s+/ ) ) { return CommonMarkTypes.HEADLINE; }
-
-			// Special Headline
-			if ( type === CommonMarkTypes.PARAGRAPH )
-			{
-				if ( line.match( /^\={2,}$/ ) ) { return CommonMarkTypes.HEADLINE1; }
-				if ( line.match( /^\-{2,}$/ ) ) { return CommonMarkTypes.HEADLINE2; }
-			}
-
-			// Line
-			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) ) { return CommonMarkTypes.HORIZON; }
-
-			// List
-			if ( line.match( /^ {0,3}[\-\*] / ) ) { return CommonMarkTypes.ULIST; }
-
-			// Code block
-			if ( line.match( /^\>{0,1}(\t|    | {1,3}\t)/ ) ) { return CommonMarkTypes.CODE; }
-
-			// No line
-			if ( !line ) { return CommonMarkTypes.NONE; }
-
-			return CommonMarkTypes.PARAGRAPH;
+			const last = this.lastNode();
+			if ( !last ) { return false; }
+			return last.getTag() === tag;
 		}
 
 		private lastNode( node: LiteNode = this.root ): LiteNode|null
@@ -299,104 +263,221 @@ module TSCommonMark
 			}
 			return this._innermostNode( <LiteNode>this.lastNode( node ), tag );
 		}
+	}
 
-		private inList(): boolean
+	class CommonMarkBlock
+	{
+		private root: LiteNode;
+
+		constructor()
 		{
-			const last = this.lastNode();
-			if ( !last || last.getTag === undefined ) { return false; }
-			return last.getTag() === 'ul';
+			this.root = new LiteNode();
 		}
 
-		private addHeadline( now: CommonMarkTypes, line: string )
+		public parse( lines: string[], beforeList: boolean )
 		{
-			const [ lv, title ] = line.split( /\s+/, 2 );
-			const root = new LiteNode( 'h' + lv.length );
-			root.appendChild( new LiteTextNode( title ) );
-			this.root.appendChild( root );
-		}
+			if ( lines.length <= 0  ) { return null; }
 
-		private addHeadlineSP( now: CommonMarkTypes, line: string )
-		{
-			const last = <LiteNode>this.lastNode();
-			last.changeTag( now === CommonMarkTypes.HEADLINE1 ? 'h1' : 'h2' );
-		}
+			const line = <string>lines.shift();
+			const result = this.lineParser( line, beforeList );
+			if ( result.type === CommonMarkTypes.NONE ) { return null; }
 
-		private addUList( now: CommonMarkTypes, line: string )
-		{
-			if ( now === CommonMarkTypes.ULIST ) { return; }
-			const root = new LiteNode( 'ul', { newLineBegin: true } );
-			this.root.appendChild( root );
-		}
+			const root = this.changeRoot( result.type );
 
-		private addUListItem( now: CommonMarkTypes, line: string )
-		{
-			const item = new LiteNode( 'li' );
-			item.appendChild( new LiteTextNode( line.split( /[\-\*] /, 2 )[ 1 ] ) );
-			(<LiteNode>this.innermostNode( this.lastNode(), 'ul' )).appendChild( item );//TODO:
-		}
-
-		private appendUListItem( now: CommonMarkTypes, line: string )
-		{
-			const lastli = <LiteNode>this.innermostNode( this.lastNode(), 'li' );
-
-			if ( (<LiteNode>lastli.childlen[ lastli.childlen.length - 1 ]).getTag === undefined )
+			switch ( result.type )
 			{
-				// Last li child is TextNode.
-
-				const textnode = <LiteTextNode>lastli.childlen[ lastli.childlen.length - 1 ];
-				const p = new LiteNode( 'p', { oneLine: false } );
-				p.appendChild( textnode );
-				lastli.childlen[ lastli.childlen.length - 1 ] = p;
-				lastli.changeOption( { newLineBegin: true, oneLine: false } );
+				case CommonMarkTypes.HORIZON:
+					return this.root;
 			}
-			line = line.replace( /^\t/, '' );
-			const p = new LiteNode( 'p', { oneLine: false } );
-			p.appendChild( new LiteTextNode( line ) );
-			lastli.appendChild( p );
+
+			if ( result.line && result.type !== CommonMarkTypes.CODE )
+			{
+				this.root.appendChild( this.parseInline( result.line.replace( /^[ \t]+/, '' ) ) );
+			}
+
+			switch ( result.type )
+			{
+				case CommonMarkTypes.HEADLINE1:
+				case CommonMarkTypes.HEADLINE2:
+				case CommonMarkTypes.HEADLINE3:
+				case CommonMarkTypes.HEADLINE4:
+				case CommonMarkTypes.HEADLINE5:
+				case CommonMarkTypes.HEADLINE6:
+					return this.root;
+			}
+
+			// Block element.
+			switch ( result.type )
+			{
+				case CommonMarkTypes.PARAGRAPH:
+					if ( this.specialHeadline( lines ) )
+					{
+						return this.root;
+					}
+					if ( result.option ) { return this.root; }
+					this.loopParagraph( lines );
+					break;
+				case CommonMarkTypes.CODE:
+					if ( result.option )
+					{
+						this.root.changeTag( 'blockquote' );
+						this.root.changeOption( { newLineBegin: true } );
+						const pre = new LiteNode( 'pre' );
+						pre.appendChild( this.loopCodeBlock( lines, <string>result.line ) );
+						this.root.appendChild( pre );
+					} else
+					{
+						this.root.changeTag( 'pre' );
+						this.root.appendChild( this.loopCodeBlock( lines, <string>result.line ) );
+					}
+					break;
+				case CommonMarkTypes.ULIST:
+					this.root.changeOption( { newLineBegin: true } );
+					this.root.appendChild( this.createListItem( result.option ) );
+					this.loopList( lines );
+					break;
+			}
+
+			return this.root;
 		}
 
-		private addParagraph( now: CommonMarkTypes, line: string )
+		private lineParser( line: string, beforeList?: boolean ): { type: CommonMarkTypes, line?: string, option?: any }
 		{
-			line = line.replace( /^\s+/, '' );
-			if ( !line ) { return; }
-			if ( now !== CommonMarkTypes.PARAGRAPH )
-			{
-				const root = new LiteNode( 'p' );
-				this.root.appendChild( root );
-			} else { line = '\n' + line; }
+			// No line
+			if ( !line ) { return { type: CommonMarkTypes.NONE }; }
 
-			const proot = <LiteNode>this.lastNode();
-			proot.appendChild( new CommonMarkInline().parseInline( line ) );
+			let result: RegExpMatchArray | null;
+
+			// Headline
+			if ( ( result = line.match( /^(\#{1,6})\s+(.*)$/ ) ) )
+			{
+				return { type: CommonMarkTypes.HEADLINE + result[ 1 ].length, line: result[ 2 ] };
+			}
+
+			// Horizon
+			if ( line.match( /^ {0,3}(\*\s*\*\s*\*[\s\*]*|\-\s*\-\s*\-[\s\-]*|\_\s*\_\s*\_[\s\_]*)$/ ) )
+			{
+				return { type: CommonMarkTypes.HORIZON };
+			}
+
+			// List
+			if ( ( result = line.match( /^ {0,3}[\-\*] (.*)/ ) ) )
+			{
+				return { type: CommonMarkTypes.ULIST, option: result[ 1 ] };
+			}
+
+			if ( beforeList && ( result = line.match( /^\t([^\s]+)/ ) ) )
+			{
+				return { type: CommonMarkTypes.PARAGRAPH, line: result[ 1 ], option: true };
+			}
+
+			// Code block
+			if ( ( result = line.match( /^(\>{0,1})(\t|    | {1,3}\t)(.+)/ ) ) )
+			{
+				return { type: CommonMarkTypes.CODE, line: result[ 3 ].replace( /^\t/, '  ' ), option: !!result[ 1 ] };
+			}
+
+			return { type: CommonMarkTypes.PARAGRAPH, line: line };
 		}
 
-		private addCodeBlock( now: CommonMarkTypes, line: string )
+		private specialHeadline( lines: string[] )
 		{
-			let softtab = !!line.match( /^\>/ );
-			line += '\n';
-			if ( now !== CommonMarkTypes.CODE )
+			if ( lines.length <= 0 ) { return false; }
+			const line = <string>lines.shift();
+
+			if ( line.match( /^\={2,}$/ ) )
 			{
-				let root = new LiteNode( 'pre' );
-				const coderoot = new LiteNode( 'code', { oneLine: true } );
-				root.appendChild( coderoot );
-				if ( line.match( /^\>/ ) )
+				this.changeRoot( CommonMarkTypes.HEADLINE1 );
+				return true;
+			}
+			if ( line.match( /^\-{2,}$/ ) )
+			{
+				this.changeRoot( CommonMarkTypes.HEADLINE2 );
+				return true;
+			}
+
+			lines.unshift( line );
+			return false;
+		}
+
+		private changeRoot( type: CommonMarkTypes )
+		{
+			if ( TagTable[ type ] )
+			{
+				this.root.changeTag( TagTable[ type ] );
+				return this.root;
+			}
+
+			return this.root;
+		}
+
+		private parseInline( line: string )
+		{
+			return new CommonMarkInline().parseInline( line );
+		}
+
+		private loopParagraph( lines: string[] )
+		{
+			while ( 0 < lines.length )
+			{
+				const line = <string>lines.shift();
+				const result = this.lineParser( line );
+				switch ( result.type )
 				{
-					const r = new LiteNode( 'blockquote', { newLineBegin: true } );
-					r.appendChild( root );
-					root = r;
+					case CommonMarkTypes.NONE:
+						return;
+					case CommonMarkTypes.HORIZON:
+						lines.unshift( line );
+						return;
 				}
-				this.root.appendChild( root );
+				this.root.appendChild( this.parseInline( '\n' + line.replace( /^[ \t]+/, '' ) ) );
 			}
-
-			line = line.replace( /^\>{0,1}(\t|    | {1,3}\t)/, '' );
-			if ( softtab ) { line = line.replace( '\t', '  ' ); }
-			const coderoot = <LiteNode>this.innermostNode( this.lastNode(), 'code' );
-			coderoot.appendChild( new LiteTextNode( line ) );
 		}
 
-		private addHorizon( now: CommonMarkTypes, line: string )
+		private loopCodeBlock( lines: string[], first: string )
 		{
-			const root = new LiteNode( 'hr' );
-			this.root.appendChild( root );
+			const code = new LiteNode( 'code', { oneLine: true } );
+			code.appendChild( new LiteTextNode( first + '\n' ) );
+
+			while ( 0 < lines.length )
+			{
+				const line = <string>lines.shift();
+				const result = this.lineParser( line );
+				switch ( result.type )
+				{
+					case CommonMarkTypes.NONE:
+						return code;
+				}
+				code.appendChild( new LiteTextNode( result.line + '\n' ) );
+			}
+			//const pre = new LiteNode( 'pre' );
+			//pre.appendChild( code );
+			return code;
+		}
+
+		private loopList( lines: string[] )
+		{
+			while ( 0 < lines.length )
+			{
+				const line = <string>lines.shift();
+				const result = this.lineParser( line );
+				switch ( result.type )
+				{
+					case CommonMarkTypes.NONE:
+						return;
+					case CommonMarkTypes.HORIZON:
+						lines.unshift( line );
+						return;
+				}
+				this.root.appendChild( this.createListItem( typeof result.option === 'string' ? result.option : '' ) );
+			}
+		}
+
+		private createListItem( line: string )
+		{
+			const li = new LiteNode( 'li' );
+			li.appendChild( new CommonMarkInline().parseInline( line ) );
+			return li;
 		}
 	}
 
