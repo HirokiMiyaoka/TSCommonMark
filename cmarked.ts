@@ -42,37 +42,24 @@ module TSCommonMark
 		next?: string,
 	}
 
-	export interface TagOption
+	interface TagOption
 	{
 		newLineBegin?: boolean,
 		oneLine?: boolean
 	}
 
-	export class LiteNodeBase
+	export interface LiteNodeBase
 	{
-		protected tag: string;
+		toString(): string;
 
-		constructor( tag: string, option: TagOption = {} )
-		{
-			this.tag = tag;
-		}
-
-		public changeOption( option: TagOption = {} ) {}
-
-		public toString(): string
-		{
-			return [ '<', '></', '>' ].join( this.tag );
-		}
-
-		public toDOM(): HTMLElement | Text { return document.createElement( this.tag ); }
+		toDOM(): HTMLElement | Text;
 	}
 
-	class LiteTextNode extends LiteNodeBase
+	class LiteTextNode implements LiteNodeBase
 	{
 		private text: string;
-		constructor( text: string, option: TagOption = {} )
+		constructor( text: string )
 		{
-			super( 'text', option );
 			this.text = text;
 		}
 
@@ -81,8 +68,9 @@ module TSCommonMark
 		public toDOM(): HTMLElement | Text { return document.createTextNode( this.text ); }
 	}
 
-	class LiteNode extends LiteNodeBase
+	class LiteNode implements LiteNodeBase
 	{
+		protected tag: string;
 		public childlen: LiteNodeBase[];
 		private attribute: { [ key: string ]: string };
 		private close: boolean;
@@ -91,10 +79,9 @@ module TSCommonMark
 
 		constructor( tag: string = '', option: TagOption = {} )
 		{
-			super( tag, option );
-			this.changeTag( tag );
 			this.childlen = [];
 			this.attribute = {};
+			this.changeTag( tag );
 			this.newLineBegin = false;
 			this.newLine = true;
 			this.changeOption( option );
@@ -180,10 +167,14 @@ module TSCommonMark
 		}
 	}
 
+	function isTextNode( node: LiteNodeBase )
+	{
+		return (<LiteNode>node).getTag === undefined;
+	}
+
 	export class CommonMark
 	{
 		private root: LiteNode;
-		//private stack: LiteNode[];
 
 		constructor()
 		{
@@ -201,8 +192,6 @@ module TSCommonMark
 		{
 			const lines = source.split( '\n' );
 
-			//this.parseLines( lines );
-
 			while ( 0 < lines.length )
 			{
 				const isLastList = this.checkLastNode( 'ul' );
@@ -211,7 +200,7 @@ module TSCommonMark
 				if ( isLastList && ( block.getTag() === 'pre' || block.getTag() === 'p' ) )
 				{
 					const li = <LiteNode>this.lastNode( <LiteNode>this.lastNode() );
-					if ( li.childlen.length === 1 && !(<LiteNode>li.childlen[ 0 ]).getTag )
+					if ( li.childlen.length === 1 && isTextNode( li.childlen[ 0 ] ) )
 					{
 						li.changeOption( { newLineBegin: true } );
 						const p = new LiteNode( 'p' );
@@ -250,7 +239,7 @@ module TSCommonMark
 		private _innermostNode( node: LiteNode|null, tag?: string ): LiteNode|null
 		{
 			// Text Node
-			if ( !node || node.childlen === undefined ) { return null; }
+			if ( !node || isTextNode( node ) ) { return null; }
 
 			if ( node.getTag() === tag )
 			{
@@ -361,7 +350,7 @@ module TSCommonMark
 			}
 
 			// List
-			if ( ( result = line.match( /^ {0,3}[\-\*] (.*)/ ) ) )
+			if ( ( result = line.match( /^ {0,3}[\-\*]([ \t].*)/ ) ) )
 			{
 				return { type: CommonMarkTypes.ULIST, option: result[ 1 ] };
 			}
@@ -450,8 +439,6 @@ module TSCommonMark
 				}
 				code.appendChild( new LiteTextNode( result.line + '\n' ) );
 			}
-			//const pre = new LiteNode( 'pre' );
-			//pre.appendChild( code );
 			return code;
 		}
 
@@ -476,7 +463,19 @@ module TSCommonMark
 		private createListItem( line: string )
 		{
 			const li = new LiteNode( 'li' );
-			li.appendChild( new CommonMarkInline().parseInline( line ) );
+			const result = this.lineParser( line );
+			if ( result.type === CommonMarkTypes.PARAGRAPH )
+			{
+				li.appendChild( new CommonMarkInline().parseInline( line.replace( /^[ \t]/, '' ) ) );
+				return li;
+			}
+			if ( result.type === CommonMarkTypes.CODE )
+			{
+				const pre = new LiteNode( 'pre' );
+				pre.appendChild( this.loopCodeBlock( [], result.line || '' ) );
+				li.appendChild( pre );
+				li.changeOption( { newLineBegin: true } );
+			}
 			return li;
 		}
 	}

@@ -1,12 +1,5 @@
 declare module TSCommonMark {
-    interface TagOption {
-        newLineBegin?: boolean;
-        oneLine?: boolean;
-    }
-    class LiteNodeBase {
-        protected tag: string;
-        constructor(tag: string, option?: TagOption);
-        changeOption(option?: TagOption): void;
+    interface LiteNodeBase {
         toString(): string;
         toDOM(): HTMLElement | Text;
     }
