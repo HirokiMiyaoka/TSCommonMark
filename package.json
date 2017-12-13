@@ -6,8 +6,8 @@
   "types": "index.d.ts",
   "scripts": {
     "build": "npm run bbuild & npm run nbuild",
-    "bbuild": "tsc --project browser",
-    "nbuild": "tsc --project nodejs",
+    "bbuild": "tsc --project src/browser",
+    "nbuild": "tsc --project src/nodejs",
     "script": "tsc --project script",
     "test": "node test.js"
   },

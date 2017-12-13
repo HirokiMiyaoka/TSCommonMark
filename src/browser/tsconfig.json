@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
-		"outFile": "../cmarked.js",
+		"outFile": "../../cmarked.js",
 		"module": "system",
 		"moduleResolution": "node",
 		"target": "es5",
